@@ -220,102 +220,19 @@ app.use(express.json({ limit: "1mb" }));
 // Minimal health endpoint for Railway.
 app.get("/setup/healthz", (_req, res) => res.json({ ok: true }));
 
+// Serve static files for setup wizard
 app.get("/setup/app.js", requireSetupAuth, (_req, res) => {
-  // Serve JS for /setup (kept external to avoid inline encoding/template issues)
   res.type("application/javascript");
-  res.send(
-    fs.readFileSync(path.join(process.cwd(), "src", "setup-app.js"), "utf8"),
-  );
+  res.sendFile(path.join(process.cwd(), "src", "public", "setup-app.js"));
+});
+
+app.get("/setup/styles.css", requireSetupAuth, (_req, res) => {
+  res.type("text/css");
+  res.sendFile(path.join(process.cwd(), "src", "public", "styles.css"));
 });
 
 app.get("/setup", requireSetupAuth, (_req, res) => {
-  // No inline <script>: serve JS from /setup/app.js to avoid any encoding/template-literal issues.
-  res.type("html").send(`<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Moltbot Setup</title>
-  <style>
-    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; margin: 2rem; max-width: 900px; }
-    .card { border: 1px solid #ddd; border-radius: 12px; padding: 1.25rem; margin: 1rem 0; }
-    label { display:block; margin-top: 0.75rem; font-weight: 600; }
-    input, select { width: 100%; padding: 0.6rem; margin-top: 0.25rem; }
-    button { padding: 0.8rem 1.2rem; border-radius: 10px; border: 0; background: #111; color: #fff; font-weight: 700; cursor: pointer; }
-    code { background: #f6f6f6; padding: 0.1rem 0.3rem; border-radius: 6px; }
-    .muted { color: #555; }
-  </style>
-</head>
-<body>
-  <h1>Moltbot Setup</h1>
-  <p class="muted">This wizard configures Moltbot by running the same onboarding command it uses in the terminal, but from the browser.</p>
-
-  <div class="card">
-    <h2>Status</h2>
-    <div id="status">Loading...</div>
-    <div style="margin-top: 0.75rem">
-      <a href="/moltbot" target="_blank">Open Moltbot UI</a>
-      &nbsp;|&nbsp;
-      <a href="/setup/export" target="_blank">Download backup (.tar.gz)</a>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>1) Model/auth provider</h2>
-    <p class="muted">Matches the groups shown in the terminal onboarding.</p>
-    <label>Provider group</label>
-    <select id="authGroup"></select>
-
-    <label>Auth method</label>
-    <select id="authChoice"></select>
-
-    <label>Key / Token (if required)</label>
-    <input id="authSecret" type="password" placeholder="Paste API key / token if applicable" />
-
-    <label>Wizard flow</label>
-    <select id="flow">
-      <option value="quickstart">quickstart</option>
-      <option value="advanced">advanced</option>
-      <option value="manual">manual</option>
-    </select>
-  </div>
-
-  <div class="card">
-    <h2>2) Optional: Channels</h2>
-    <p class="muted">You can also add channels later inside Moltbot, but this helps you get messaging working immediately.</p>
-
-    <label>Telegram bot token (optional)</label>
-    <input id="telegramToken" type="password" placeholder="123456:ABC..." />
-    <div class="muted" style="margin-top: 0.25rem">
-      Get it from BotFather: open Telegram, message <code>@BotFather</code>, run <code>/newbot</code>, then copy the token.
-    </div>
-
-    <label>Discord bot token (optional)</label>
-    <input id="discordToken" type="password" placeholder="Bot token" />
-    <div class="muted" style="margin-top: 0.25rem">
-      Get it from the Discord Developer Portal: create an application, add a Bot, then copy the Bot Token.<br/>
-      <strong>Important:</strong> Enable <strong>MESSAGE CONTENT INTENT</strong> in Bot → Privileged Gateway Intents, or the bot will crash on startup.
-    </div>
-
-    <label>Slack bot token (optional)</label>
-    <input id="slackBotToken" type="password" placeholder="xoxb-..." />
-
-    <label>Slack app token (optional)</label>
-    <input id="slackAppToken" type="password" placeholder="xapp-..." />
-  </div>
-
-  <div class="card">
-    <h2>3) Run onboarding</h2>
-    <button id="run">Run setup</button>
-    <button id="pairingApprove" style="background:#1f2937; margin-left:0.5rem">Approve pairing</button>
-    <button id="reset" style="background:#444; margin-left:0.5rem">Reset setup</button>
-    <pre id="log" style="white-space:pre-wrap"></pre>
-    <p class="muted">Reset deletes the Moltbot config file so you can rerun onboarding. Pairing approval lets you grant DM access when dmPolicy=pairing.</p>
-  </div>
-
-  <script src="/setup/app.js"></script>
-</body>
-</html>`);
+  res.sendFile(path.join(process.cwd(), "src", "public", "setup.html"));
 });
 
 app.get("/setup/api/status", requireSetupAuth, async (_req, res) => {

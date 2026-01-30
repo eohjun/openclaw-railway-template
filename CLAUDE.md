@@ -73,8 +73,11 @@ open http://localhost:8080/setup  # password: test
 
 ### Key Files
 
-- **src/server.js** (main entry): Express wrapper, proxy setup, gateway lifecycle management, configuration persistence
-- **src/setup-app.js**: Client-side JS for `/setup` wizard (vanilla JS, no build step)
+- **src/server.js** (main entry): Express wrapper, proxy setup, gateway lifecycle management, configuration persistence (server logic only - no inline HTML/CSS)
+- **src/public/** (static assets for setup wizard):
+  - **setup.html**: Setup wizard HTML structure
+  - **styles.css**: Setup wizard styling (extracted from inline styles)
+  - **setup-app.js**: Client-side JS for `/setup` wizard (vanilla JS, no build step)
 - **Dockerfile**: Multi-stage build (builds Moltbot from source, installs wrapper deps)
 
 ### Environment Variables
@@ -96,9 +99,9 @@ open http://localhost:8080/setup  # password: test
 
 The wrapper manages a **two-layer auth scheme**:
 
-1. **Setup wizard auth**: Basic auth with `SETUP_PASSWORD` (src/server.js:190-214)
+1. **Setup wizard auth**: Basic auth with `SETUP_PASSWORD` (src/server.js:190)
 2. **Gateway auth**: Bearer token (auto-generated or from `MOLTBOT_GATEWAY_TOKEN` env)
-   - Token is auto-injected into proxied requests (src/server.js:831, src/server.js:847)
+   - Token is auto-injected into proxied requests (src/server.js:736, src/server.js:741)
    - Persisted to `${STATE_DIR}/gateway.token` if not provided via env (src/server.js:25-48)
 
 ### Onboarding Process
@@ -117,8 +120,8 @@ When the user runs setup (src/server.js:522-693):
 
 The wrapper **always** injects the bearer token into proxied requests so browser clients don't need to know it:
 
-- HTTP requests: via `proxy.on("proxyReq")` event handler (src/server.js:~814)
-- WebSocket upgrades: via `proxy.on("proxyReqWs")` event handler (src/server.js:~818)
+- HTTP requests: via `proxy.on("proxyReq")` event handler (src/server.js:736)
+- WebSocket upgrades: via `proxy.on("proxyReqWs")` event handler (src/server.js:741)
 
 **Important**: Token injection uses `http-proxy` event handlers (`proxyReq` and `proxyReqWs`) rather than direct `req.headers` modification. Direct header modification does not reliably work with WebSocket upgrades, causing intermittent `token_missing` or `token_mismatch` errors.
 
@@ -143,7 +146,7 @@ This allows the Control UI at `/moltbot` to work without user authentication.
 ### Testing authentication
 
 - Setup wizard: Clear browser auth, verify Basic auth challenge
-- Gateway: Remove `Authorization` header injection (src/server.js:831) and verify requests fail
+- Gateway: Remove `Authorization` header injection (src/server.js:736) and verify requests fail
 
 ### Debugging gateway startup
 
@@ -163,9 +166,9 @@ Edit `buildOnboardArgs()` (src/server.js:442-496) to add new CLI flags or auth p
 
 ### Adding new channel types
 
-1. Add channel-specific fields to `/setup` HTML (src/server.js:231-319)
-2. Add config-writing logic in `/setup/api/run` handler (src/server.js:584-677)
-3. Update client JS to collect the fields (src/setup-app.js:72-81)
+1. Add channel-specific fields to `/setup` HTML (src/public/setup.html)
+2. Add config-writing logic in `/setup/api/run` handler (src/server.js)
+3. Update client JS to collect the fields (src/public/setup-app.js)
 
 ## Railway Deployment Notes
 
@@ -202,5 +205,5 @@ This avoids repeatedly reading large files and provides instant context about th
 3. **Gateway readiness check polls multiple endpoints** (`/moltbot`, `/`, `/health`) → some builds only expose certain routes (src/server.js:92)
 4. **Discord bots require MESSAGE CONTENT INTENT** → document this in setup wizard (src/server.js:295-298)
 5. **Gateway spawn inherits stdio** → logs appear in wrapper output (src/server.js:134)
-6. **WebSocket auth requires proxy event handlers** → Direct `req.headers` modification doesn't work for WebSocket upgrades with http-proxy; must use `proxyReqWs` event (src/server.js:~818) to reliably inject Authorization header
+6. **WebSocket auth requires proxy event handlers** → Direct `req.headers` modification doesn't work for WebSocket upgrades with http-proxy; must use `proxyReqWs` event (src/server.js:741) to reliably inject Authorization header
 7. **Control UI requires allowInsecureAuth to bypass pairing** → Set `gateway.controlUi.allowInsecureAuth=true` during onboarding to prevent "disconnected (1008): pairing required" errors (GitHub issue #2284). Wrapper already handles bearer token auth, so device pairing is unnecessary.
