@@ -233,6 +233,7 @@ This avoids repeatedly reading large files and provides instant context about th
 10. **Supported auth providers** → OpenAI, Anthropic, Google, OpenRouter, Vercel AI Gateway, Moonshot, Z.AI, MiniMax, Qwen, Copilot, Synthetic, OpenCode Zen, LiteLLM, xAI, Baidu Qianfan. Flag mappings in `buildOnboardArgs()`.
 11. **IRC channel support** → Setup wizard supports IRC server/nick/channels/password configuration via `config set --json channels.irc`.
 12. **Feishu/Lark moved to community plugin** → No longer built-in; users must install `clawdbot-feishu` from the plugin registry.
-13. **Container runs as non-root `node` user** → `entrypoint.sh` handles ownership fixup for existing root-owned `/data` volumes via `sudo chown`.
+13. **DO NOT use `USER node` in Dockerfile** → Railway 볼륨(`/data`)은 root 소유이며, non-root 사용자로 전환하면 기존 config/data 파일 접근 불가. `entrypoint.sh`의 `chown` 우회도 실패함. Railway 컨테이너는 격리 환경이므로 root 실행 유지.
 14. **Token logging is debug-only** → Full token values are only logged when `OPENCLAW_TEMPLATE_DEBUG=true`. Production logs show only first 16 chars.
 15. **Plugin auto-enable disabled** → `plugins.autoEnable` set to `false` during onboarding for security.
+16. **Railway 대시보드 Start Command가 최우선** → 대시보드 Settings → Deploy의 Custom Start Command가 `railway.toml`의 `startCommand`와 Dockerfile `CMD`보다 우선함. 배포 실패 시 코드를 의심하기 전에 대시보드 설정부터 확인할 것.
