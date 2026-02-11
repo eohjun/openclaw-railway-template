@@ -78,8 +78,8 @@ open http://localhost:8080/setup  # password: test
   - **setup.html**: Setup wizard HTML structure
   - **styles.css**: Setup wizard styling (extracted from inline styles)
   - **setup-app.js**: Client-side JS for `/setup` wizard (vanilla JS, no build step)
-- **Dockerfile**: Multi-stage build (builds Openclaw from source, installs wrapper deps, runs as non-root `node` user)
-- **entrypoint.sh**: Fixes ownership of root-owned `/data` volumes from prior deployments before exec
+- **Dockerfile**: Multi-stage build (builds Openclaw from source, installs wrapper deps, runs as root)
+- **railway.toml**: Railway deploy config (healthcheck path, start command)
 
 ### Environment Variables
 
@@ -104,23 +104,23 @@ open http://localhost:8080/setup  # password: test
 
 The wrapper manages a **two-layer auth scheme**:
 
-1. **Setup wizard auth**: Basic auth with `SETUP_PASSWORD` (src/server.js:190)
+1. **Setup wizard auth**: Basic auth with `SETUP_PASSWORD` (src/server.js:278)
 2. **Gateway auth**: Bearer token with multi-source resolution and automatic sync
-   - **Token resolution order** (src/server.js:25-55):
+   - **Token resolution order** (src/server.js:31-69):
      1. `OPENCLAW_GATEWAY_TOKEN` env variable (highest priority) ✅
      2. Persisted file at `${STATE_DIR}/gateway.token`
      3. Generate new random token and persist
    - **Token synchronization**:
-     - During onboarding: Synced to `openclaw.json` with verification (src/server.js:478-511)
-     - Every gateway start: Synced to `openclaw.json` with verification (src/server.js:120-143)
+     - During onboarding: Synced to `openclaw.json` with verification (src/server.js:610-656)
+     - Every gateway start: Synced to `openclaw.json` with verification (src/server.js:148-189)
      - Reason: Openclaw gateway reads token from config file, not from `--token` flag
    - **Token injection**:
-     - HTTP requests: via `proxy.on("proxyReq")` event handler (src/server.js:761)
-     - WebSocket upgrades: via `proxy.on("proxyReqWs")` event handler (src/server.js:766)
+     - HTTP requests: via `proxy.on("proxyReq")` event handler (src/server.js:958)
+     - WebSocket upgrades: via `proxy.on("proxyReqWs")` event handler (src/server.js:964)
 
 ### Onboarding Process
 
-When the user runs setup (src/server.js:447-650):
+When the user runs setup (src/server.js:554-830):
 
 1. Calls `openclaw onboard --non-interactive` with user-selected auth provider and `--gateway-token` flag
 2. **Syncs wrapper token to `openclaw.json`** (overwrites whatever `onboard` generated):
@@ -138,8 +138,8 @@ When the user runs setup (src/server.js:447-650):
 
 The wrapper **always** injects the bearer token into proxied requests so browser clients don't need to know it:
 
-- HTTP requests: via `proxy.on("proxyReq")` event handler (src/server.js:736)
-- WebSocket upgrades: via `proxy.on("proxyReqWs")` event handler (src/server.js:741)
+- HTTP requests: via `proxy.on("proxyReq")` event handler (src/server.js:958)
+- WebSocket upgrades: via `proxy.on("proxyReqWs")` event handler (src/server.js:964)
 
 **Important**: Token injection uses `http-proxy` event handlers (`proxyReq` and `proxyReqWs`) rather than direct `req.headers` modification. Direct header modification does not reliably work with WebSocket upgrades, causing intermittent `token_missing` or `token_mismatch` errors.
 
@@ -147,7 +147,7 @@ This allows the Control UI at `/openclaw` to work without user authentication.
 
 ### Backup Export
 
-`GET /setup/export` (src/server.js:752-800):
+`GET /setup/export` (src/server.js:896-943):
 
 - Creates a `.tar.gz` archive of `STATE_DIR` and `WORKSPACE_DIR`
 - Preserves relative structure under `/data` (e.g., `.openclaw/`, `workspace/`)
@@ -164,15 +164,15 @@ This allows the Control UI at `/openclaw` to work without user authentication.
 ### Testing authentication
 
 - Setup wizard: Clear browser auth, verify Basic auth challenge
-- Gateway: Remove `Authorization` header injection (src/server.js:736) and verify requests fail
+- Gateway: Remove `Authorization` header injection (src/server.js:958) and verify requests fail
 
 ### Debugging gateway startup
 
 Check logs for:
 
-- `[gateway] starting with command: ...` (src/server.js:142)
-- `[gateway] ready at <endpoint>` (src/server.js:100)
-- `[gateway] failed to become ready after 20000ms` (src/server.js:109)
+- `[gateway] starting with command: ...` (src/server.js:214)
+- `[gateway] ready at <endpoint>` (src/server.js:127)
+- `[gateway] failed to become ready after 20000ms` (src/server.js:136)
 
 If gateway doesn't start:
 
@@ -182,7 +182,7 @@ If gateway doesn't start:
 
 ### Modifying onboarding args
 
-Edit `buildOnboardArgs()` (src/server.js:442-496) to add new CLI flags or auth providers.
+Edit `buildOnboardArgs()` (src/server.js:471-527) to add new CLI flags or auth providers.
 
 ### Adding new channel types
 
@@ -221,12 +221,12 @@ This avoids repeatedly reading large files and provides instant context about th
 
 ## Quirks & Gotchas
 
-1. **Gateway token must be stable across redeploys** → Always set `OPENCLAW_GATEWAY_TOKEN` env variable in Railway (highest priority); token is synced to `openclaw.json` during onboarding (src/server.js:478-511) and on every gateway start (src/server.js:120-143) with verification. This is required because `openclaw onboard` generates its own random token and the gateway reads from config file, not from `--token` CLI flag. Sync failures throw errors and prevent gateway startup.
+1. **Gateway token must be stable across redeploys** → Always set `OPENCLAW_GATEWAY_TOKEN` env variable in Railway (highest priority); token is synced to `openclaw.json` during onboarding (src/server.js:610-656) and on every gateway start (src/server.js:148-189) with verification. This is required because `openclaw onboard` generates its own random token and the gateway reads from config file, not from `--token` CLI flag. Sync failures throw errors and prevent gateway startup.
 2. **Channels are written via `config set --json`, not `channels add`** → avoids CLI version incompatibilities
-3. **Gateway readiness check polls multiple endpoints** (`/openclaw`, `/`, `/health`) → some builds only expose certain routes (src/server.js:92)
-4. **Discord bots require MESSAGE CONTENT INTENT** → document this in setup wizard (src/server.js:295-298)
-5. **Gateway spawn inherits stdio** → logs appear in wrapper output (src/server.js:134)
-6. **WebSocket auth requires proxy event handlers** → Direct `req.headers` modification doesn't work for WebSocket upgrades with http-proxy; must use `proxyReqWs` event (src/server.js:741) to reliably inject Authorization header
+3. **Gateway readiness check polls multiple endpoints** (`/openclaw`, `/`, `/health`) → some builds only expose certain routes (src/server.js:119)
+4. **Discord bots require MESSAGE CONTENT INTENT** → documented in setup wizard (src/public/setup.html)
+5. **Gateway spawn inherits stdio** → logs appear in wrapper output (src/server.js:206)
+6. **WebSocket auth requires proxy event handlers** → Direct `req.headers` modification doesn't work for WebSocket upgrades with http-proxy; must use `proxyReqWs` event (src/server.js:964) to reliably inject Authorization header
 7. **Control UI requires allowInsecureAuth to bypass pairing** → Set `gateway.controlUi.allowInsecureAuth=true` during onboarding to prevent "disconnected (1008): pairing required" errors (GitHub issue #2284). Wrapper already handles bearer token auth, so device pairing is unnecessary.
 8. **Gateway `--allow-unconfigured` flag** → Added to gateway spawn args to support latest openclaw builds that require explicit opt-in for unconfigured state. Ignored by older builds.
 9. **Discord `dm` key renamed to `direct`** → Latest openclaw renamed the session key from `dm` to `direct` (with backward compat layer). Wrapper uses `direct` for forward compatibility.
