@@ -84,6 +84,9 @@ COPY --from=openclaw-build /openclaw /openclaw
 RUN printf '%s\n' '#!/usr/bin/env bash' 'exec node /openclaw/dist/entry.js "$@"' > /usr/local/bin/openclaw \
   && chmod +x /usr/local/bin/openclaw
 
+# Cache buster: change this value to force a full rebuild
+ARG CACHE_BUST=2026-02-12
+
 COPY src ./src
 
 ENV PORT=8080
