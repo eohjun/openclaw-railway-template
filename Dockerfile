@@ -86,18 +86,6 @@ RUN printf '%s\n' '#!/usr/bin/env bash' 'exec node /openclaw/dist/entry.js "$@"'
 
 COPY src ./src
 
-# Run as non-root user for security
-RUN chown -R node:node /app /openclaw
-RUN chmod -R a+rX /home/linuxbrew/.linuxbrew
-# Allow node user to use sudo for volume ownership fixup
-RUN echo 'node ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
-
-COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
-
-USER node
-
-ENTRYPOINT ["entrypoint.sh"]
 ENV PORT=8080
 EXPOSE 8080
 CMD ["node", "src/server.js"]
