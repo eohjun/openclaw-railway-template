@@ -50,7 +50,11 @@ Then:
 - Complete setup
 - Visit `https://<your-app>.up.railway.app/` and `/openclaw`
 
-## Getting chat tokens (so you don’t have to scramble)
+## Supported auth providers
+
+OpenAI (Codex OAuth, API key), Anthropic (Claude Code CLI, setup-token, API key), Google (Gemini API key, Antigravity OAuth, Gemini CLI), OpenRouter, Vercel AI Gateway, Moonshot AI (Kimi K2/Kimi Code), Z.AI (GLM 4.7), MiniMax (M2.1/M2.1 Lightning), Qwen (OAuth), GitHub Copilot (device login, local proxy), Synthetic, OpenCode Zen, LiteLLM, xAI (Grok), Baidu Qianfan.
+
+## Getting chat tokens (so you don't have to scramble)
 
 ### Telegram bot token
 
@@ -66,6 +70,16 @@ Then:
 3. Open the **Bot** tab → **Add Bot**
 4. Copy the **Bot Token** and paste it into `/setup`
 5. Invite the bot to your server (OAuth2 URL Generator → scopes: `bot`, `applications.commands`; then choose permissions)
+
+### IRC bot setup
+
+1. Choose an IRC server (e.g., `irc.libera.chat:6697`)
+2. Pick a nickname for the bot (e.g., `openclaw-bot`)
+3. Enter target channels as comma-separated values (e.g., `#mychannel,#other`)
+4. Optionally provide a NickServ password for registered nicknames
+5. Paste these values into `/setup`
+
+**Note:** Feishu/Lark is now a community plugin. Install `clawdbot-feishu` from the plugin registry if needed.
 
 ## Local smoke test
 

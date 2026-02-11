@@ -43,6 +43,7 @@
   <div class="card">
     <h2>2) Optional: Channels</h2>
     <p class="muted">You can also add channels later inside Openclaw, but this helps you get messaging working immediately.</p>
+    <p class="muted"><strong>Note:</strong> Feishu/Lark is now a community plugin. Install clawdbot-feishu from the plugin registry if needed.</p>
 
     <label>Telegram bot token (optional)</label>
     <input id="telegramToken" type="password" placeholder="123456:ABC..." />
@@ -62,6 +63,18 @@
 
     <label>Slack app token (optional)</label>
     <input id="slackAppToken" type="password" placeholder="xapp-..." />
+
+    <label>IRC server (optional)</label>
+    <input id="ircServer" type="text" placeholder="irc.libera.chat:6697" />
+
+    <label>IRC nickname (optional)</label>
+    <input id="ircNick" type="text" placeholder="openclaw-bot" />
+
+    <label>IRC channels (comma-separated, optional)</label>
+    <input id="ircChannels" type="text" placeholder="#mychannel" />
+
+    <label>IRC password (optional)</label>
+    <input id="ircPassword" type="password" placeholder="NickServ password" />
   </div>
 
   <div class="card">

@@ -78,7 +78,8 @@ open http://localhost:8080/setup  # password: test
   - **setup.html**: Setup wizard HTML structure
   - **styles.css**: Setup wizard styling (extracted from inline styles)
   - **setup-app.js**: Client-side JS for `/setup` wizard (vanilla JS, no build step)
-- **Dockerfile**: Multi-stage build (builds Openclaw from source, installs wrapper deps)
+- **Dockerfile**: Multi-stage build (builds Openclaw from source, installs wrapper deps, runs as non-root `node` user)
+- **entrypoint.sh**: Fixes ownership of root-owned `/data` volumes from prior deployments before exec
 
 ### Environment Variables
 
@@ -97,6 +98,7 @@ open http://localhost:8080/setup  # password: test
 - `PORT` — wrapper HTTP port (default 8080)
 - `INTERNAL_GATEWAY_PORT` — gateway internal port (default 18789)
 - `OPENCLAW_ENTRY` — path to `entry.js` (default `/openclaw/dist/entry.js`)
+- `OPENCLAW_TEMPLATE_DEBUG` — set to `true` to enable verbose token/proxy logging
 
 ### Authentication Flow
 
@@ -125,8 +127,8 @@ When the user runs setup (src/server.js:447-650):
    - Sets `gateway.auth.token` to `OPENCLAW_GATEWAY_TOKEN` env variable
    - Verifies sync succeeded by reading config file back
    - Logs warning/error if mismatch detected
-3. Writes channel configs (Telegram/Discord/Slack) directly to `openclaw.json` via `openclaw config set --json`
-4. Force-sets gateway config to use token auth + loopback bind + allowInsecureAuth
+3. Writes channel configs (Telegram/Discord/Slack/IRC) directly to `openclaw.json` via `openclaw config set --json`
+4. Force-sets gateway config to use token auth + loopback bind + allowInsecureAuth + plugins.autoEnable=false
 5. Restarts gateway process to apply all config changes
 6. Waits for gateway readiness (polls multiple endpoints)
 
@@ -226,3 +228,11 @@ This avoids repeatedly reading large files and provides instant context about th
 5. **Gateway spawn inherits stdio** → logs appear in wrapper output (src/server.js:134)
 6. **WebSocket auth requires proxy event handlers** → Direct `req.headers` modification doesn't work for WebSocket upgrades with http-proxy; must use `proxyReqWs` event (src/server.js:741) to reliably inject Authorization header
 7. **Control UI requires allowInsecureAuth to bypass pairing** → Set `gateway.controlUi.allowInsecureAuth=true` during onboarding to prevent "disconnected (1008): pairing required" errors (GitHub issue #2284). Wrapper already handles bearer token auth, so device pairing is unnecessary.
+8. **Gateway `--allow-unconfigured` flag** → Added to gateway spawn args to support latest openclaw builds that require explicit opt-in for unconfigured state. Ignored by older builds.
+9. **Discord `dm` key renamed to `direct`** → Latest openclaw renamed the session key from `dm` to `direct` (with backward compat layer). Wrapper uses `direct` for forward compatibility.
+10. **Supported auth providers** → OpenAI, Anthropic, Google, OpenRouter, Vercel AI Gateway, Moonshot, Z.AI, MiniMax, Qwen, Copilot, Synthetic, OpenCode Zen, LiteLLM, xAI, Baidu Qianfan. Flag mappings in `buildOnboardArgs()`.
+11. **IRC channel support** → Setup wizard supports IRC server/nick/channels/password configuration via `config set --json channels.irc`.
+12. **Feishu/Lark moved to community plugin** → No longer built-in; users must install `clawdbot-feishu` from the plugin registry.
+13. **Container runs as non-root `node` user** → `entrypoint.sh` handles ownership fixup for existing root-owned `/data` volumes via `sudo chown`.
+14. **Token logging is debug-only** → Full token values are only logged when `OPENCLAW_TEMPLATE_DEBUG=true`. Production logs show only first 16 chars.
+15. **Plugin auto-enable disabled** → `plugins.autoEnable` set to `false` during onboarding for security.

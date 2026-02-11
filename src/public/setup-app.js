@@ -77,7 +77,11 @@
       telegramToken: document.getElementById('telegramToken').value,
       discordToken: document.getElementById('discordToken').value,
       slackBotToken: document.getElementById('slackBotToken').value,
-      slackAppToken: document.getElementById('slackAppToken').value
+      slackAppToken: document.getElementById('slackAppToken').value,
+      ircServer: document.getElementById('ircServer').value,
+      ircNick: document.getElementById('ircNick').value,
+      ircChannels: document.getElementById('ircChannels').value,
+      ircPassword: document.getElementById('ircPassword').value
     };
 
     logEl.textContent = 'Running...\n';
@@ -103,11 +107,11 @@
   var pairingBtn = document.getElementById('pairingApprove');
   if (pairingBtn) {
     pairingBtn.onclick = function () {
-      var channel = prompt('Enter channel (telegram or discord):');
+      var channel = prompt('Enter channel (telegram, discord, slack, or irc):');
       if (!channel) return;
       channel = channel.trim().toLowerCase();
-      if (channel !== 'telegram' && channel !== 'discord') {
-        alert('Channel must be "telegram" or "discord"');
+      if (channel !== 'telegram' && channel !== 'discord' && channel !== 'slack' && channel !== 'irc') {
+        alert('Channel must be "telegram", "discord", "slack", or "irc"');
         return;
       }
       var code = prompt('Enter pairing code (e.g. 3EY4PUYS):');

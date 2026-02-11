@@ -38,7 +38,7 @@ function resolveGatewayToken() {
   if (envTok) {
     console.log(`[token] ✓ Using token from OPENCLAW_GATEWAY_TOKEN env variable`);
     console.log(`[token]   First 16 chars: ${envTok.slice(0, 16)}...`);
-    console.log(`[token]   Full token: ${envTok}`);
+    debug(`[token]   Full token: ${envTok}`);
     return envTok;
   }
 
@@ -174,8 +174,8 @@ async function startGateway() {
 
     if (configToken !== OPENCLAW_GATEWAY_TOKEN) {
       console.error(`[gateway] ✗ Token mismatch detected!`);
-      console.error(`[gateway]   Full wrapper: ${OPENCLAW_GATEWAY_TOKEN}`);
-      console.error(`[gateway]   Full config:  ${configToken || 'null'}`);
+      debug(`[gateway]   Full wrapper: ${OPENCLAW_GATEWAY_TOKEN}`);
+      debug(`[gateway]   Full config:  ${configToken || 'null'}`);
       throw new Error(
         `Token mismatch: wrapper has ${OPENCLAW_GATEWAY_TOKEN.slice(0, 16)}... but config has ${(configToken || 'null')?.slice?.(0, 16)}...`
       );
@@ -199,6 +199,7 @@ async function startGateway() {
     "token",
     "--token",
     OPENCLAW_GATEWAY_TOKEN,
+    "--allow-unconfigured",
   ];
 
   gatewayProc = childProcess.spawn(OPENCLAW_NODE, clawArgs(args), {
@@ -432,6 +433,30 @@ app.get("/setup/api/status", requireSetupAuth, async (_req, res) => {
         { value: "opencode-zen", label: "OpenCode Zen (multi-model proxy)" },
       ],
     },
+    {
+      value: "litellm",
+      label: "LiteLLM",
+      hint: "Proxy (multi-model)",
+      options: [
+        { value: "litellm-api-key", label: "LiteLLM API key" },
+      ],
+    },
+    {
+      value: "xai",
+      label: "xAI",
+      hint: "Grok API key",
+      options: [
+        { value: "xai-api-key", label: "xAI Grok API key" },
+      ],
+    },
+    {
+      value: "baidu",
+      label: "Baidu Qianfan",
+      hint: "API key",
+      options: [
+        { value: "qianfan-api-key", label: "Baidu Qianfan API key" },
+      ],
+    },
   ];
 
   res.json({
@@ -484,6 +509,9 @@ function buildOnboardArgs(payload) {
       "minimax-api-lightning": "--minimax-api-key",
       "synthetic-api-key": "--synthetic-api-key",
       "opencode-zen": "--opencode-zen-api-key",
+      "litellm-api-key": "--litellm-api-key",
+      "xai-api-key": "--xai-api-key",
+      "qianfan-api-key": "--qianfan-api-key",
     };
     const flag = map[payload.authChoice];
     if (flag && secret) {
@@ -614,8 +642,8 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
 
         if (configToken !== OPENCLAW_GATEWAY_TOKEN) {
           console.error(`[onboard] ✗ ERROR: Token mismatch after config set!`);
-          console.error(`[onboard]   Full wrapper token: ${OPENCLAW_GATEWAY_TOKEN}`);
-          console.error(`[onboard]   Full config token:  ${configToken || 'null'}`);
+          debug(`[onboard]   Full wrapper token: ${OPENCLAW_GATEWAY_TOKEN}`);
+          debug(`[onboard]   Full config token:  ${configToken || 'null'}`);
           extra += `\n[ERROR] Token verification failed! Config has different token than wrapper.\n`;
           extra += `  Wrapper: ${OPENCLAW_GATEWAY_TOKEN.slice(0, 16)}...\n`;
           extra += `  Config:  ${configToken?.slice(0, 16)}...\n`;
@@ -647,6 +675,12 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
       await runCmd(
         OPENCLAW_NODE,
         clawArgs(["config", "set", "gateway.controlUi.allowInsecureAuth", "true"]),
+      );
+
+      // Disable automatic plugin activation for security
+      await runCmd(
+        OPENCLAW_NODE,
+        clawArgs(["config", "set", "plugins.autoEnable", "false"]),
       );
 
       const channelsHelp = await runCmd(
@@ -700,7 +734,7 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
             enabled: true,
             token,
             groupPolicy: "allowlist",
-            dm: {
+            direct: {
               policy: "pairing",
             },
           };
@@ -749,6 +783,40 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
           );
           extra += `\n[slack config] exit=${set.code} (output ${set.output.length} chars)\n${set.output || "(no output)"}`;
           extra += `\n[slack verify] exit=${get.code} (output ${get.output.length} chars)\n${get.output || "(no output)"}`;
+        }
+      }
+
+      if (payload.ircServer?.trim()) {
+        if (!supports("irc")) {
+          extra +=
+            "\n[irc] skipped (this openclaw build does not list irc in `channels add --help`)\n";
+        } else {
+          const cfgObj = {
+            enabled: true,
+            server: payload.ircServer.trim(),
+            nick: payload.ircNick?.trim() || "openclaw-bot",
+            channels: (payload.ircChannels || "")
+              .split(",")
+              .map((c) => c.trim())
+              .filter(Boolean),
+            password: payload.ircPassword?.trim() || undefined,
+          };
+          const set = await runCmd(
+            OPENCLAW_NODE,
+            clawArgs([
+              "config",
+              "set",
+              "--json",
+              "channels.irc",
+              JSON.stringify(cfgObj),
+            ]),
+          );
+          const get = await runCmd(
+            OPENCLAW_NODE,
+            clawArgs(["config", "get", "channels.irc"]),
+          );
+          extra += `\n[irc config] exit=${set.code}\n${set.output || "(no output)"}`;
+          extra += `\n[irc verify] exit=${get.code}\n${get.output || "(no output)"}`;
         }
       }
 
@@ -887,15 +955,15 @@ proxy.on("error", (err, _req, _res) => {
 });
 
 // Inject auth token into HTTP proxy requests
-proxy.on("proxyReq", (proxyReq, req, res) => {
-  console.log(`[proxy] HTTP ${req.method} ${req.url} - injecting token: ${OPENCLAW_GATEWAY_TOKEN.slice(0, 16)}...`);
+proxy.on("proxyReq", (proxyReq, req) => {
+  debug(`[proxy] HTTP ${req.method} ${req.url} - injecting token: ${OPENCLAW_GATEWAY_TOKEN.slice(0, 16)}...`);
   proxyReq.setHeader("Authorization", `Bearer ${OPENCLAW_GATEWAY_TOKEN}`);
 });
 
 // Log WebSocket upgrade proxy events (token is injected via headers option in server.on("upgrade"))
-proxy.on("proxyReqWs", (proxyReq, req, socket, options, head) => {
-  console.log(`[proxy-event] WebSocket proxyReqWs event fired for ${req.url}`);
-  console.log(`[proxy-event] Headers:`, JSON.stringify(proxyReq.getHeaders()));
+proxy.on("proxyReqWs", (proxyReq, req) => {
+  debug(`[proxy-event] WebSocket proxyReqWs event fired for ${req.url}`);
+  debug(`[proxy-event] Headers:`, JSON.stringify(proxyReq.getHeaders()));
 });
 
 app.use(async (req, res) => {
@@ -940,7 +1008,7 @@ server.on("upgrade", async (req, socket, head) => {
   }
 
   // Inject auth token via headers option (req.headers modification doesn't work for WS)
-  console.log(`[ws-upgrade] Proxying WebSocket upgrade with token: ${OPENCLAW_GATEWAY_TOKEN.slice(0, 16)}...`);
+  debug(`[ws-upgrade] Proxying WebSocket upgrade with token: ${OPENCLAW_GATEWAY_TOKEN.slice(0, 16)}...`);
 
   proxy.ws(req, socket, head, {
     target: GATEWAY_TARGET,
