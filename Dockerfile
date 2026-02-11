@@ -88,7 +88,17 @@ RUN printf '%s\n' '#!/usr/bin/env bash' 'exec node /openclaw/dist/entry.js "$@"'
 ARG CACHE_BUST=2026-02-12
 
 COPY src ./src
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
+# Run as non-root user for security
+RUN chown -R node:node /app /openclaw
+RUN chmod -R a+rX /home/linuxbrew/.linuxbrew
+RUN echo 'node ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+
+USER node
+
+ENTRYPOINT ["entrypoint.sh"]
 ENV PORT=8080
 EXPOSE 8080
 CMD ["node", "src/server.js"]

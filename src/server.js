@@ -199,14 +199,8 @@ async function startGateway() {
     "token",
     "--token",
     OPENCLAW_GATEWAY_TOKEN,
+    "--allow-unconfigured",
   ];
-
-  // Only add --allow-unconfigured if this build supports it
-  const helpResult = await runCmd(OPENCLAW_NODE, clawArgs(["gateway", "run", "--help"]));
-  if (helpResult.output?.includes("allow-unconfigured")) {
-    args.push("--allow-unconfigured");
-    console.log("[gateway] --allow-unconfigured flag supported, adding to args");
-  }
 
   gatewayProc = childProcess.spawn(OPENCLAW_NODE, clawArgs(args), {
     stdio: "inherit",
