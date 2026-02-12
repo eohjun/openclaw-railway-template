@@ -67,9 +67,9 @@ open http://localhost:8080/setup  # password: test
    - User completes setup wizard → runs `openclaw onboard --non-interactive`
 
 2. **Configured**: `openclaw.json` exists
-   - Wrapper spawns `openclaw gateway run` as child process
-   - Waits for gateway to respond on multiple health endpoints
-   - Proxies all traffic with injected bearer token
+   - Gateway starts eagerly at boot (not lazily on first request)
+   - While gateway is starting, requests get a loading page (`loading.html`, auto-refreshes)
+   - Once ready, proxies all traffic with injected bearer token
 
 ### Key Files
 
@@ -78,6 +78,7 @@ open http://localhost:8080/setup  # password: test
   - **setup.html**: Setup wizard HTML structure
   - **styles.css**: Setup wizard styling (extracted from inline styles)
   - **setup-app.js**: Client-side JS for `/setup` wizard (vanilla JS, no build step)
+  - **loading.html**: "Starting up" page shown while gateway is launching (auto-refreshes every 3s)
 - **Dockerfile**: Multi-stage build (builds Openclaw from source, installs wrapper deps, runs as root)
 - **railway.toml**: Railway deploy config (healthcheck path, start command)
 
@@ -104,7 +105,7 @@ open http://localhost:8080/setup  # password: test
 
 The wrapper manages a **two-layer auth scheme**:
 
-1. **Setup wizard auth**: Basic auth with `SETUP_PASSWORD` (src/server.js:278)
+1. **Setup wizard auth**: Basic auth with `SETUP_PASSWORD`, timing-safe comparison, rate-limited (50 req/min per IP)
 2. **Gateway auth**: Bearer token with multi-source resolution and automatic sync
    - **Token resolution order** (src/server.js:31-69):
      1. `OPENCLAW_GATEWAY_TOKEN` env variable (highest priority) ✅
@@ -237,3 +238,5 @@ This avoids repeatedly reading large files and provides instant context about th
 14. **Token logging is debug-only** → Full token values are only logged when `OPENCLAW_TEMPLATE_DEBUG=true`. Production logs show only first 16 chars.
 15. **Plugin auto-enable disabled** → `plugins.autoEnable` set to `false` during onboarding for security.
 16. **Railway 대시보드 Start Command가 최우선** → 대시보드 Settings → Deploy의 Custom Start Command가 `railway.toml`의 `startCommand`와 Dockerfile `CMD`보다 우선함. 배포 실패 시 코드를 의심하기 전에 대시보드 설정부터 확인할 것.
+17. **Setup auth uses timing-safe comparison** → Password checked via `crypto.timingSafeEqual` on SHA-256 hashes to prevent timing attacks. Rate-limited at 50 requests/min per IP with in-memory tracker.
+18. **Gateway starts eagerly at boot** → `ensureGatewayRunning()` is called in the `listen` callback when configured. Requests arriving before gateway is ready get `loading.html` (auto-refresh 3s) instead of a 503 error.

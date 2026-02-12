@@ -109,6 +109,10 @@ function isConfigured() {
 let gatewayProc = null;
 let gatewayStarting = null;
 
+function isGatewayStarting() {
+  return gatewayStarting !== null && gatewayProc === null;
+}
+
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -275,6 +279,31 @@ async function restartGateway() {
   return ensureGatewayRunning();
 }
 
+const setupRateLimiter = {
+  attempts: new Map(),
+  windowMs: 60_000,
+  maxAttempts: 50,
+  cleanupInterval: setInterval(function () {
+    const now = Date.now();
+    for (const [ip, data] of setupRateLimiter.attempts) {
+      if (now - data.windowStart > setupRateLimiter.windowMs) {
+        setupRateLimiter.attempts.delete(ip);
+      }
+    }
+  }, 60_000),
+  isRateLimited(ip) {
+    const now = Date.now();
+    const data = this.attempts.get(ip);
+    if (!data || now - data.windowStart > this.windowMs) {
+      this.attempts.set(ip, { windowStart: now, count: 1 });
+      return false;
+    }
+    data.count++;
+    return data.count > this.maxAttempts;
+  },
+};
+setupRateLimiter.cleanupInterval.unref();
+
 function requireSetupAuth(req, res, next) {
   if (!SETUP_PASSWORD) {
     return res
@@ -283,6 +312,11 @@ function requireSetupAuth(req, res, next) {
       .send(
         "SETUP_PASSWORD is not set. Set it in Railway Variables before using /setup.",
       );
+  }
+
+  const ip = req.ip || req.socket?.remoteAddress || "unknown";
+  if (setupRateLimiter.isRateLimited(ip)) {
+    return res.status(429).type("text/plain").send("Too many requests. Try again later.");
   }
 
   const header = req.headers.authorization || "";
@@ -294,7 +328,9 @@ function requireSetupAuth(req, res, next) {
   const decoded = Buffer.from(encoded, "base64").toString("utf8");
   const idx = decoded.indexOf(":");
   const password = idx >= 0 ? decoded.slice(idx + 1) : "";
-  if (password !== SETUP_PASSWORD) {
+  const passwordHash = crypto.createHash("sha256").update(password).digest();
+  const expectedHash = crypto.createHash("sha256").update(SETUP_PASSWORD).digest();
+  if (!crypto.timingSafeEqual(passwordHash, expectedHash)) {
     res.set("WWW-Authenticate", 'Basic realm="Openclaw Setup"');
     return res.status(401).send("Invalid password");
   }
@@ -973,6 +1009,9 @@ app.use(async (req, res) => {
   }
 
   if (isConfigured()) {
+    if (isGatewayStarting()) {
+      return res.sendFile(path.join(process.cwd(), "src", "public", "loading.html"));
+    }
     try {
       await ensureGatewayRunning();
     } catch (err) {
@@ -992,6 +1031,12 @@ const server = app.listen(PORT, () => {
   console.log(`[wrapper] listening on port ${PORT}`);
   console.log(`[wrapper] setup wizard: http://localhost:${PORT}/setup`);
   console.log(`[wrapper] configured: ${isConfigured()}`);
+
+  if (isConfigured()) {
+    ensureGatewayRunning().catch((err) => {
+      console.error(`[wrapper] failed to start gateway at boot: ${err.message}`);
+    });
+  }
 });
 
 // Handle WebSocket upgrades
