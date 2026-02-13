@@ -374,7 +374,6 @@ app.get("/setup/api/status", requireSetupAuth, async (_req, res) => {
       label: "OpenAI",
       hint: "Codex OAuth + API key",
       options: [
-        { value: "codex-cli", label: "OpenAI Codex OAuth (Codex CLI)" },
         { value: "openai-codex", label: "OpenAI Codex (ChatGPT OAuth)" },
         { value: "openai-api-key", label: "OpenAI API key" },
       ],
@@ -382,9 +381,8 @@ app.get("/setup/api/status", requireSetupAuth, async (_req, res) => {
     {
       value: "anthropic",
       label: "Anthropic",
-      hint: "Claude Code CLI + API key",
+      hint: "setup-token + API key",
       options: [
-        { value: "claude-cli", label: "Anthropic token (Claude Code CLI)" },
         { value: "token", label: "Anthropic token (paste setup-token)" },
         { value: "apiKey", label: "Anthropic API key" },
       ],
@@ -415,26 +413,33 @@ app.get("/setup/api/status", requireSetupAuth, async (_req, res) => {
     },
     {
       value: "moonshot",
-      label: "Moonshot AI",
-      hint: "Kimi K2 + Kimi Code",
+      label: "Moonshot AI (Kimi K2.5)",
+      hint: "Kimi K2.5 + Kimi Coding",
       options: [
         { value: "moonshot-api-key", label: "Moonshot AI API key" },
+        { value: "moonshot-api-key-cn", label: "Moonshot AI API key (CN)" },
         { value: "kimi-code-api-key", label: "Kimi Code API key" },
       ],
     },
     {
       value: "zai",
       label: "Z.AI (GLM 4.7)",
-      hint: "API key",
-      options: [{ value: "zai-api-key", label: "Z.AI (GLM 4.7) API key" }],
+      hint: "GLM Coding Plan / Global / CN",
+      options: [
+        { value: "zai-api-key", label: "Z.AI API key (auto-detect)" },
+        { value: "zai-coding-global", label: "Z.AI Coding (Global)" },
+        { value: "zai-coding-cn", label: "Z.AI Coding (CN)" },
+        { value: "zai-global", label: "Z.AI (Global)" },
+        { value: "zai-cn", label: "Z.AI (CN)" },
+      ],
     },
     {
       value: "minimax",
       label: "MiniMax",
-      hint: "M2.1 (recommended)",
+      hint: "M2.5 (recommended)",
       options: [
-        { value: "minimax-api", label: "MiniMax M2.1" },
-        { value: "minimax-api-lightning", label: "MiniMax M2.1 Lightning" },
+        { value: "minimax-api", label: "MiniMax M2.5" },
+        { value: "minimax-api-lightning", label: "MiniMax M2.5 Lightning" },
       ],
     },
     {
@@ -472,7 +477,7 @@ app.get("/setup/api/status", requireSetupAuth, async (_req, res) => {
     {
       value: "litellm",
       label: "LiteLLM",
-      hint: "Proxy (multi-model)",
+      hint: "Unified LLM gateway (100+ providers)",
       options: [
         { value: "litellm-api-key", label: "LiteLLM API key" },
       ],
@@ -491,6 +496,38 @@ app.get("/setup/api/status", requireSetupAuth, async (_req, res) => {
       hint: "API key",
       options: [
         { value: "qianfan-api-key", label: "Baidu Qianfan API key" },
+      ],
+    },
+    {
+      value: "xiaomi",
+      label: "Xiaomi",
+      hint: "API key",
+      options: [
+        { value: "xiaomi-api-key", label: "Xiaomi API key" },
+      ],
+    },
+    {
+      value: "venice",
+      label: "Venice AI",
+      hint: "Privacy-focused (uncensored models)",
+      options: [
+        { value: "venice-api-key", label: "Venice AI API key" },
+      ],
+    },
+    {
+      value: "together",
+      label: "Together AI",
+      hint: "API key",
+      options: [
+        { value: "together-api-key", label: "Together AI API key" },
+      ],
+    },
+    {
+      value: "cloudflare",
+      label: "Cloudflare AI Gateway",
+      hint: "API key (also requires account-id + gateway-id in env)",
+      options: [
+        { value: "cloudflare-ai-gateway-api-key", label: "Cloudflare AI Gateway API key" },
       ],
     },
   ];
@@ -538,9 +575,14 @@ function buildOnboardArgs(payload) {
       "openrouter-api-key": "--openrouter-api-key",
       "ai-gateway-api-key": "--ai-gateway-api-key",
       "moonshot-api-key": "--moonshot-api-key",
+      "moonshot-api-key-cn": "--moonshot-api-key",
       "kimi-code-api-key": "--kimi-code-api-key",
       "gemini-api-key": "--gemini-api-key",
       "zai-api-key": "--zai-api-key",
+      "zai-coding-global": "--zai-api-key",
+      "zai-coding-cn": "--zai-api-key",
+      "zai-global": "--zai-api-key",
+      "zai-cn": "--zai-api-key",
       "minimax-api": "--minimax-api-key",
       "minimax-api-lightning": "--minimax-api-key",
       "synthetic-api-key": "--synthetic-api-key",
@@ -548,6 +590,10 @@ function buildOnboardArgs(payload) {
       "litellm-api-key": "--litellm-api-key",
       "xai-api-key": "--xai-api-key",
       "qianfan-api-key": "--qianfan-api-key",
+      "xiaomi-api-key": "--xiaomi-api-key",
+      "venice-api-key": "--venice-api-key",
+      "together-api-key": "--together-api-key",
+      "cloudflare-ai-gateway-api-key": "--cloudflare-ai-gateway-api-key",
     };
     const flag = map[payload.authChoice];
     if (flag && secret) {

@@ -85,7 +85,7 @@ RUN printf '%s\n' '#!/usr/bin/env bash' 'exec node /openclaw/dist/entry.js "$@"'
   && chmod +x /usr/local/bin/openclaw
 
 # Cache buster: change this value to force a full rebuild
-ARG CACHE_BUST=2026-02-12
+ARG CACHE_BUST=2026-02-13
 
 COPY src ./src
 
