@@ -183,7 +183,7 @@ If gateway doesn't start:
 
 ### Modifying onboarding args
 
-Edit `buildOnboardArgs()` (src/server.js:471-527) to add new CLI flags or auth providers.
+Edit `buildOnboardArgs()` (src/server.js:552-619) to add new CLI flags or auth providers.
 
 ### Adding new channel types
 
@@ -231,7 +231,7 @@ This avoids repeatedly reading large files and provides instant context about th
 7. **Control UI requires allowInsecureAuth to bypass pairing** → Set `gateway.controlUi.allowInsecureAuth=true` during onboarding to prevent "disconnected (1008): pairing required" errors (GitHub issue #2284). Wrapper already handles bearer token auth, so device pairing is unnecessary.
 8. **Gateway `--allow-unconfigured` flag** → Added to gateway spawn args to support latest openclaw builds that require explicit opt-in for unconfigured state. Ignored by older builds.
 9. **Discord `dm` key renamed to `direct`** → Latest openclaw renamed the session key from `dm` to `direct` (with backward compat layer). Wrapper uses `direct` for forward compatibility.
-10. **Supported auth providers** → OpenAI, Anthropic, Google, OpenRouter, Vercel AI Gateway, Moonshot AI (Kimi K2.5), Z.AI (GLM 4.7, multiple endpoint variants), MiniMax (M2.5), Qwen, Copilot, Synthetic, OpenCode Zen, LiteLLM, xAI, Baidu Qianfan, Xiaomi, Venice AI, Together AI, Cloudflare AI Gateway. Flag mappings in `buildOnboardArgs()`.
+10. **Supported auth providers** → OpenAI, Anthropic, Google, OpenRouter, Vercel AI Gateway, Moonshot AI (Kimi K2.5), Z.AI (GLM 4.7, multiple endpoint variants), MiniMax (M2.5), Qwen, Copilot, Synthetic, OpenCode Zen, LiteLLM, xAI, Baidu Qianfan, Xiaomi, Venice AI, Together AI, Hugging Face Inference, Cloudflare AI Gateway. Flag mappings in `buildOnboardArgs()`.
 11. **IRC channel support** → Setup wizard supports IRC server/nick/channels/password configuration via `config set --json channels.irc`.
 12. **Feishu/Lark moved to community plugin** → No longer built-in; users must install `clawdbot-feishu` from the plugin registry.
 13. **DO NOT use `USER node` in Dockerfile** → Railway 볼륨(`/data`)은 root 소유이며, non-root 사용자로 전환하면 기존 config/data 파일 접근 불가. `entrypoint.sh`의 `chown` 우회도 실패함. Railway 컨테이너는 격리 환경이므로 root 실행 유지.

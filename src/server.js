@@ -523,6 +523,14 @@ app.get("/setup/api/status", requireSetupAuth, async (_req, res) => {
       ],
     },
     {
+      value: "huggingface",
+      label: "Hugging Face Inference",
+      hint: "API key (HF token with Inference permission)",
+      options: [
+        { value: "huggingface-api-key", label: "Hugging Face API key" },
+      ],
+    },
+    {
       value: "cloudflare",
       label: "Cloudflare AI Gateway",
       hint: "API key (also requires account-id + gateway-id in env)",
@@ -593,6 +601,7 @@ function buildOnboardArgs(payload) {
       "xiaomi-api-key": "--xiaomi-api-key",
       "venice-api-key": "--venice-api-key",
       "together-api-key": "--together-api-key",
+      "huggingface-api-key": "--huggingface-api-key",
       "cloudflare-ai-gateway-api-key": "--cloudflare-ai-gateway-api-key",
     };
     const flag = map[payload.authChoice];
