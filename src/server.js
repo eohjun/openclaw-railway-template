@@ -388,27 +388,26 @@ app.get("/setup/api/status", requireSetupAuth, async (_req, res) => {
       ],
     },
     {
-      value: "google",
-      label: "Google",
-      hint: "Gemini API key + OAuth",
-      options: [
-        { value: "gemini-api-key", label: "Google Gemini API key" },
-        { value: "google-antigravity", label: "Google Antigravity OAuth" },
-        { value: "google-gemini-cli", label: "Google Gemini CLI OAuth" },
-      ],
+      value: "chutes",
+      label: "Chutes",
+      hint: "OAuth",
+      options: [{ value: "chutes-portal", label: "Chutes OAuth" }],
     },
     {
-      value: "openrouter",
-      label: "OpenRouter",
-      hint: "API key",
-      options: [{ value: "openrouter-api-key", label: "OpenRouter API key" }],
+      value: "vllm",
+      label: "vLLM",
+      hint: "Local / self-hosted",
+      options: [{ value: "vllm-portal", label: "vLLM OAuth" }],
     },
     {
-      value: "ai-gateway",
-      label: "Vercel AI Gateway",
-      hint: "API key",
+      value: "minimax",
+      label: "MiniMax",
+      hint: "M2.5 (recommended)",
       options: [
-        { value: "ai-gateway-api-key", label: "Vercel AI Gateway API key" },
+        { value: "minimax-portal", label: "MiniMax OAuth" },
+        { value: "minimax-api", label: "MiniMax M2.5" },
+        { value: "minimax-api-lightning", label: "MiniMax M2.5 Lightning" },
+        { value: "minimax-api-key-cn", label: "MiniMax M2.5 (CN)" },
       ],
     },
     {
@@ -422,11 +421,40 @@ app.get("/setup/api/status", requireSetupAuth, async (_req, res) => {
       ],
     },
     {
-      value: "zai",
-      label: "Z.AI (GLM 4.7)",
-      hint: "GLM Coding Plan / Global / CN",
+      value: "google",
+      label: "Google",
+      hint: "Gemini API key + OAuth",
       options: [
-        { value: "zai-api-key", label: "Z.AI API key (auto-detect)" },
+        { value: "gemini-api-key", label: "Google Gemini API key" },
+        { value: "google-antigravity", label: "Google Antigravity OAuth" },
+        { value: "google-gemini-cli", label: "Google Gemini CLI OAuth" },
+      ],
+    },
+    {
+      value: "xai",
+      label: "xAI (Grok)",
+      hint: "Grok API key",
+      options: [
+        { value: "xai-api-key", label: "xAI Grok API key" },
+      ],
+    },
+    {
+      value: "openrouter",
+      label: "OpenRouter",
+      hint: "API key",
+      options: [{ value: "openrouter-api-key", label: "OpenRouter API key" }],
+    },
+    {
+      value: "qwen",
+      label: "Qwen",
+      hint: "OAuth",
+      options: [{ value: "qwen-portal", label: "Qwen OAuth" }],
+    },
+    {
+      value: "zai",
+      label: "Z.AI",
+      hint: "GLM Coding / Global / CN",
+      options: [
         { value: "zai-coding-global", label: "Z.AI Coding (Global)" },
         { value: "zai-coding-cn", label: "Z.AI Coding (CN)" },
         { value: "zai-global", label: "Z.AI (Global)" },
@@ -434,19 +462,12 @@ app.get("/setup/api/status", requireSetupAuth, async (_req, res) => {
       ],
     },
     {
-      value: "minimax",
-      label: "MiniMax",
-      hint: "M2.5 (recommended)",
+      value: "qianfan",
+      label: "Qianfan",
+      hint: "API key",
       options: [
-        { value: "minimax-api", label: "MiniMax M2.5" },
-        { value: "minimax-api-lightning", label: "MiniMax M2.5 Lightning" },
+        { value: "qianfan-api-key", label: "Qianfan API key" },
       ],
-    },
-    {
-      value: "qwen",
-      label: "Qwen",
-      hint: "OAuth",
-      options: [{ value: "qwen-portal", label: "Qwen OAuth" }],
     },
     {
       value: "copilot",
@@ -461,10 +482,12 @@ app.get("/setup/api/status", requireSetupAuth, async (_req, res) => {
       ],
     },
     {
-      value: "synthetic",
-      label: "Synthetic",
-      hint: "Anthropic-compatible (multi-model)",
-      options: [{ value: "synthetic-api-key", label: "Synthetic API key" }],
+      value: "ai-gateway",
+      label: "Vercel AI Gateway",
+      hint: "API key",
+      options: [
+        { value: "ai-gateway-api-key", label: "Vercel AI Gateway API key" },
+      ],
     },
     {
       value: "opencode-zen",
@@ -472,30 +495,6 @@ app.get("/setup/api/status", requireSetupAuth, async (_req, res) => {
       hint: "API key",
       options: [
         { value: "opencode-zen", label: "OpenCode Zen (multi-model proxy)" },
-      ],
-    },
-    {
-      value: "litellm",
-      label: "LiteLLM",
-      hint: "Unified LLM gateway (100+ providers)",
-      options: [
-        { value: "litellm-api-key", label: "LiteLLM API key" },
-      ],
-    },
-    {
-      value: "xai",
-      label: "xAI",
-      hint: "Grok API key",
-      options: [
-        { value: "xai-api-key", label: "xAI Grok API key" },
-      ],
-    },
-    {
-      value: "baidu",
-      label: "Baidu Qianfan",
-      hint: "API key",
-      options: [
-        { value: "qianfan-api-key", label: "Baidu Qianfan API key" },
       ],
     },
     {
@@ -507,12 +506,10 @@ app.get("/setup/api/status", requireSetupAuth, async (_req, res) => {
       ],
     },
     {
-      value: "venice",
-      label: "Venice AI",
-      hint: "Privacy-focused (uncensored models)",
-      options: [
-        { value: "venice-api-key", label: "Venice AI API key" },
-      ],
+      value: "synthetic",
+      label: "Synthetic",
+      hint: "Anthropic-compatible (multi-model)",
+      options: [{ value: "synthetic-api-key", label: "Synthetic API key" }],
     },
     {
       value: "together",
@@ -524,18 +521,42 @@ app.get("/setup/api/status", requireSetupAuth, async (_req, res) => {
     },
     {
       value: "huggingface",
-      label: "Hugging Face Inference",
+      label: "Hugging Face",
       hint: "API key (HF token with Inference permission)",
       options: [
         { value: "huggingface-api-key", label: "Hugging Face API key" },
       ],
     },
     {
-      value: "cloudflare",
+      value: "venice",
+      label: "Venice AI",
+      hint: "Privacy-focused (uncensored models)",
+      options: [
+        { value: "venice-api-key", label: "Venice AI API key" },
+      ],
+    },
+    {
+      value: "litellm",
+      label: "LiteLLM",
+      hint: "Unified LLM gateway (100+ providers)",
+      options: [
+        { value: "litellm-api-key", label: "LiteLLM API key" },
+      ],
+    },
+    {
+      value: "cloudflare-ai-gateway",
       label: "Cloudflare AI Gateway",
       hint: "API key (also requires account-id + gateway-id in env)",
       options: [
         { value: "cloudflare-ai-gateway-api-key", label: "Cloudflare AI Gateway API key" },
+      ],
+    },
+    {
+      value: "custom",
+      label: "Custom Provider",
+      hint: "Any OpenAI/Anthropic-compatible endpoint",
+      options: [
+        { value: "custom-api-key", label: "Custom Provider API key" },
       ],
     },
   ];
@@ -603,6 +624,8 @@ function buildOnboardArgs(payload) {
       "together-api-key": "--together-api-key",
       "huggingface-api-key": "--huggingface-api-key",
       "cloudflare-ai-gateway-api-key": "--cloudflare-ai-gateway-api-key",
+      "custom-api-key": "--custom-api-key",
+      "minimax-api-key-cn": "--minimax-api-key",
     };
     const flag = map[payload.authChoice];
     if (flag && secret) {
@@ -612,6 +635,22 @@ function buildOnboardArgs(payload) {
     if (payload.authChoice === "token" && secret) {
       // This is the Anthropics setup-token flow.
       args.push("--token-provider", "anthropic", "--token", secret);
+    }
+
+    // Custom provider extra args
+    if (payload.authChoice === "custom-api-key") {
+      if (payload.customBaseUrl?.trim()) {
+        args.push("--custom-base-url", payload.customBaseUrl.trim());
+      }
+      if (payload.customModelId?.trim()) {
+        args.push("--custom-model-id", payload.customModelId.trim());
+      }
+      if (payload.customProviderId?.trim()) {
+        args.push("--custom-provider-id", payload.customProviderId.trim());
+      }
+      if (payload.customCompatibility?.trim()) {
+        args.push("--custom-compatibility", payload.customCompatibility.trim());
+      }
     }
   }
 

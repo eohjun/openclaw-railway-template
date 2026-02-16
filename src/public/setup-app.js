@@ -35,7 +35,19 @@
         opt2.textContent = o.label + (o.hint ? ' - ' + o.hint : '');
         authChoiceEl.appendChild(opt2);
       }
+      updateCustomFields();
     };
+
+    authChoiceEl.onchange = function () {
+      updateCustomFields();
+    };
+
+    function updateCustomFields() {
+      var el = document.getElementById('customProviderFields');
+      if (el) {
+        el.style.display = authChoiceEl.value === 'custom-api-key' ? '' : 'none';
+      }
+    }
 
     authGroupEl.onchange();
   }
@@ -81,7 +93,11 @@
       ircServer: document.getElementById('ircServer').value,
       ircNick: document.getElementById('ircNick').value,
       ircChannels: document.getElementById('ircChannels').value,
-      ircPassword: document.getElementById('ircPassword').value
+      ircPassword: document.getElementById('ircPassword').value,
+      customBaseUrl: document.getElementById('customBaseUrl').value,
+      customModelId: document.getElementById('customModelId').value,
+      customProviderId: document.getElementById('customProviderId').value,
+      customCompatibility: document.getElementById('customCompatibility').value
     };
 
     logEl.textContent = 'Running...\n';

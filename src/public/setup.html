@@ -32,6 +32,23 @@
     <label>Key / Token (if required)</label>
     <input id="authSecret" type="password" placeholder="Paste API key / token if applicable" />
 
+    <div id="customProviderFields" style="display:none">
+      <label>Custom Base URL</label>
+      <input id="customBaseUrl" type="text" placeholder="https://api.example.com/v1" />
+
+      <label>Custom Model ID</label>
+      <input id="customModelId" type="text" placeholder="my-model-id" />
+
+      <label>Custom Provider ID (optional)</label>
+      <input id="customProviderId" type="text" placeholder="my-provider" />
+
+      <label>Compatibility mode</label>
+      <select id="customCompatibility">
+        <option value="openai">OpenAI-compatible</option>
+        <option value="anthropic">Anthropic-compatible</option>
+      </select>
+    </div>
+
     <label>Wizard flow</label>
     <select id="flow">
       <option value="quickstart">quickstart</option>
