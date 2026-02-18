@@ -21,7 +21,7 @@ RUN corepack enable
 WORKDIR /openclaw
 
 # Pin to a known ref (tag/branch). If it doesn't exist, fall back to main.
-ARG OPENCLAW_GIT_REF=v2026.2.15
+ARG OPENCLAW_GIT_REF=v2026.2.17
 RUN git clone --depth 1 --branch "${OPENCLAW_GIT_REF}" https://github.com/openclaw/openclaw.git .
 
 # Patch: relax version requirements for packages that may reference unpublished versions.
@@ -91,12 +91,19 @@ RUN pnpm install --prod --frozen-lockfile && pnpm store prune
 # Copy built openclaw
 COPY --from=openclaw-build /openclaw /openclaw
 
+# Optional: pre-install Chromium + Xvfb for browser/playwright skills (~300MB).
+# Set --build-arg OPENCLAW_INSTALL_BROWSER=true to enable.
+ARG OPENCLAW_INSTALL_BROWSER=false
+RUN if [ "$OPENCLAW_INSTALL_BROWSER" = "true" ]; then \
+      node /openclaw/dist/entry.js browser install 2>&1 || true; \
+    fi
+
 # Provide a openclaw executable
 RUN printf '%s\n' '#!/usr/bin/env bash' 'exec node /openclaw/dist/entry.js "$@"' > /usr/local/bin/openclaw \
   && chmod +x /usr/local/bin/openclaw
 
 # Cache buster: change this value to force a full rebuild
-ARG CACHE_BUST=2026-02-16
+ARG CACHE_BUST=2026-02-18
 
 COPY src ./src
 

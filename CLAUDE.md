@@ -196,7 +196,7 @@ Edit `buildOnboardArgs()` (src/server.js:552-619) to add new CLI flags or auth p
 - Template must mount a volume at `/data`
 - Must set `SETUP_PASSWORD` in Railway Variables
 - Public networking must be enabled (assigns `*.up.railway.app` domain)
-- Openclaw version is pinned via Docker build arg `OPENCLAW_GIT_REF` (default: `v2026.2.15`)
+- Openclaw version is pinned via Docker build arg `OPENCLAW_GIT_REF` (default: `v2026.2.17`)
 
 ## Serena Semantic Coding
 
@@ -244,3 +244,4 @@ This avoids repeatedly reading large files and provides instant context about th
 20. **Cloudflare AI Gateway requires extra IDs** → In addition to the API key, Cloudflare requires `--cloudflare-ai-gateway-account-id` and `--cloudflare-ai-gateway-gateway-id`. The setup wizard only supports the API key field; users must set account/gateway IDs via environment variables or post-setup `config set`.
 21. **Custom Provider support** → v2026.2.15 added `custom-api-key` auth choice with `--custom-base-url`, `--custom-model-id`, `--custom-provider-id`, and `--custom-compatibility` (openai/anthropic) flags. The setup wizard shows extra fields when Custom Provider is selected.
 22. **Skill-enabling binaries in container** → `gh` (GitHub CLI), `ffmpeg`, `tmux` installed in the runtime image to unlock `github`, `video-frames`, `tmux` skills respectively. Skills also depend on env vars (`GEMINI_API_KEY`, `NOTION_API_KEY`, `OPENAI_API_KEY`, etc.) and tool policy settings.
+23. **Optional Chromium pre-install** → Build with `--build-arg OPENCLAW_INSTALL_BROWSER=true` to pre-install Chromium + Xvfb (~300MB) into the image. Avoids the 60-90s runtime Playwright install on first browser skill use. Disabled by default to keep image size small.

@@ -391,13 +391,13 @@ app.get("/setup/api/status", requireSetupAuth, async (_req, res) => {
       value: "chutes",
       label: "Chutes",
       hint: "OAuth",
-      options: [{ value: "chutes-portal", label: "Chutes OAuth" }],
+      options: [{ value: "chutes", label: "Chutes OAuth" }],
     },
     {
       value: "vllm",
       label: "vLLM",
       hint: "Local / self-hosted",
-      options: [{ value: "vllm-portal", label: "vLLM OAuth" }],
+      options: [{ value: "vllm", label: "vLLM OAuth" }],
     },
     {
       value: "minimax",
