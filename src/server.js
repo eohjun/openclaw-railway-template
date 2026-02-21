@@ -156,7 +156,7 @@ async function startGateway() {
   );
   await runCmd(
     OPENCLAW_NODE,
-    clawArgs(["config", "set", "--json", "gateway.trustedProxies", JSON.stringify(["127.0.0.1", "::1"])]),
+    clawArgs(["config", "set", "--json", "gateway.auth.trustedProxy", JSON.stringify(["127.0.0.1", "::1"])]),
   );
 
   // Ensure hooks.token differs from gateway.auth.token (GHSA-76m6-pj3w-v7mf)
@@ -733,7 +733,7 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
       // Trust the wrapper's loopback proxy so the gateway treats connections as local
       await runCmd(
         OPENCLAW_NODE,
-        clawArgs(["config", "set", "--json", "gateway.trustedProxies", JSON.stringify(["127.0.0.1", "::1"])]),
+        clawArgs(["config", "set", "--json", "gateway.auth.trustedProxy", JSON.stringify(["127.0.0.1", "::1"])]),
       );
 
       // Disable automatic plugin activation for security
