@@ -148,31 +148,30 @@ async function startGateway() {
   fs.mkdirSync(STATE_DIR, { recursive: true });
   fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
 
-  // Re-apply gateway config on every start (doctor migrations can reset config)
-  // trusted-proxy mode: connections from trustedProxies are implicitly authenticated
-  await runCmd(
-    OPENCLAW_NODE,
-    clawArgs(["config", "set", "gateway.auth.mode", "trusted-proxy"]),
-  );
-  await runCmd(
-    OPENCLAW_NODE,
-    clawArgs(["config", "set", "--json", "gateway.auth.trustedProxy", JSON.stringify(["127.0.0.1", "::1"])]),
-  );
-
-  // Ensure hooks.token differs from gateway.auth.token (GHSA-76m6-pj3w-v7mf)
+  // Re-apply gateway config on every start (doctor migrations can reset config).
+  // Write directly to JSON file to avoid CLI config-set parsing issues with nested keys.
   try {
-    const cfg = JSON.parse(fs.readFileSync(configPath(), "utf8"));
+    const cfgPath = configPath();
+    const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+
+    // trusted-proxy mode: connections from trustedProxy addresses are implicitly authenticated
+    cfg.gateway = cfg.gateway || {};
+    cfg.gateway.auth = cfg.gateway.auth || {};
+    cfg.gateway.auth.mode = "trusted-proxy";
+    cfg.gateway.auth.trustedProxy = ["127.0.0.1", "::1"];
+
+    // Ensure hooks.token differs from gateway.auth.token (GHSA-76m6-pj3w-v7mf)
     const hooksToken = cfg?.hooks?.token;
     if (hooksToken && hooksToken === OPENCLAW_GATEWAY_TOKEN) {
-      const newHooksToken = crypto.randomBytes(32).toString("hex");
-      await runCmd(
-        OPENCLAW_NODE,
-        clawArgs(["config", "set", "hooks.token", newHooksToken]),
-      );
+      cfg.hooks = cfg.hooks || {};
+      cfg.hooks.token = crypto.randomBytes(32).toString("hex");
       console.log("[gateway] Regenerated hooks.token to avoid collision (GHSA-76m6-pj3w-v7mf)");
     }
+
+    fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2), "utf8");
+    console.log(`[gateway] Config updated: auth.mode=trusted-proxy, trustedProxy=[loopback]`);
   } catch (err) {
-    console.log(`[gateway] Could not check hooks token segregation: ${err.message}`);
+    console.error(`[gateway] Failed to update config: ${err.message}`);
   }
 
   // No --auth flag: gateway reads auth mode from config file (set above to "trusted-proxy").
@@ -711,51 +710,37 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
 
     // Post-onboard config + optional channel setup.
     if (ok) {
-      // Set gateway to trusted-proxy auth mode (connections from trustedProxies are implicitly authenticated)
-      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.mode", "local"]));
-      await runCmd(
-        OPENCLAW_NODE,
-        clawArgs(["config", "set", "gateway.auth.mode", "trusted-proxy"]),
-      );
-      await runCmd(
-        OPENCLAW_NODE,
-        clawArgs(["config", "set", "gateway.bind", "loopback"]),
-      );
-      await runCmd(
-        OPENCLAW_NODE,
-        clawArgs([
-          "config",
-          "set",
-          "gateway.port",
-          String(INTERNAL_GATEWAY_PORT),
-        ]),
-      );
-      // Trust the wrapper's loopback proxy so the gateway treats connections as local
-      await runCmd(
-        OPENCLAW_NODE,
-        clawArgs(["config", "set", "--json", "gateway.auth.trustedProxy", JSON.stringify(["127.0.0.1", "::1"])]),
-      );
-
-      // Disable automatic plugin activation for security
-      await runCmd(
-        OPENCLAW_NODE,
-        clawArgs(["config", "set", "plugins.autoEnable", "false"]),
-      );
-
-      // Ensure hooks.token differs from gateway.auth.token (GHSA-76m6-pj3w-v7mf)
+      // Post-onboard: write gateway config directly to JSON file.
+      // This is more reliable than `config set` for nested keys like gateway.auth.trustedProxy.
       try {
-        const cfg = JSON.parse(fs.readFileSync(configPath(), "utf8"));
+        const cfgPath = configPath();
+        const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+
+        cfg.gateway = cfg.gateway || {};
+        cfg.gateway.mode = "local";
+        cfg.gateway.bind = "loopback";
+        cfg.gateway.port = INTERNAL_GATEWAY_PORT;
+        cfg.gateway.auth = cfg.gateway.auth || {};
+        cfg.gateway.auth.mode = "trusted-proxy";
+        cfg.gateway.auth.trustedProxy = ["127.0.0.1", "::1"];
+
+        // Disable automatic plugin activation for security
+        cfg.plugins = cfg.plugins || {};
+        cfg.plugins.autoEnable = false;
+
+        // Ensure hooks.token differs from gateway.auth.token (GHSA-76m6-pj3w-v7mf)
         const hooksToken = cfg?.hooks?.token;
         if (hooksToken && hooksToken === OPENCLAW_GATEWAY_TOKEN) {
-          const newHooksToken = crypto.randomBytes(32).toString("hex");
-          await runCmd(
-            OPENCLAW_NODE,
-            clawArgs(["config", "set", "hooks.token", newHooksToken]),
-          );
+          cfg.hooks = cfg.hooks || {};
+          cfg.hooks.token = crypto.randomBytes(32).toString("hex");
           console.log("[onboard] Regenerated hooks.token to avoid collision with gateway token");
         }
+
+        fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2), "utf8");
+        console.log("[onboard] Config updated: auth.mode=trusted-proxy, trustedProxy=[loopback], plugins.autoEnable=false");
       } catch (err) {
-        console.log(`[onboard] Could not check hooks token segregation: ${err.message}`);
+        console.error(`[onboard] Failed to update config: ${err.message}`);
+        extra += `\n[ERROR] Failed to update config: ${err.message}\n`;
       }
 
       const channelsHelp = await runCmd(
