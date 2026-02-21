@@ -154,15 +154,21 @@ async function startGateway() {
     const cfgPath = configPath();
     const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
 
-    // trusted-proxy mode: connections from trustedProxies are implicitly authenticated.
-    // trustedProxies is a top-level gateway array; trustedProxy under auth is an object with userHeader.
+    // Token auth mode with trustedProxies for loopback proxy.
+    // Note: trusted-proxy auth mode has a known unmerged bug (PR #17705) where
+    // the device-pairing layer doesn't recognize it, causing "pairing required" errors.
+    // Token auth works because sharedAuthOk bypasses device pairing.
     cfg.gateway = cfg.gateway || {};
     cfg.gateway.trustedProxies = ["127.0.0.1", "::1"];
     cfg.gateway.auth = cfg.gateway.auth || {};
-    cfg.gateway.auth.mode = "trusted-proxy";
-    cfg.gateway.auth.trustedProxy = {
-      userHeader: "x-forwarded-user",
-    };
+    cfg.gateway.auth.mode = "token";
+    cfg.gateway.auth.token = OPENCLAW_GATEWAY_TOKEN;
+    // Remove stale trusted-proxy config if present from previous runs
+    delete cfg.gateway.auth.trustedProxy;
+
+    // Allow Control UI connections over plain HTTP (reverse proxy terminates TLS)
+    cfg.gateway.controlUi = cfg.gateway.controlUi || {};
+    cfg.gateway.controlUi.allowInsecureAuth = true;
 
     // Ensure hooks.token differs from gateway.auth.token (GHSA-76m6-pj3w-v7mf)
     const hooksToken = cfg?.hooks?.token;
@@ -173,13 +179,11 @@ async function startGateway() {
     }
 
     fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2), "utf8");
-    console.log(`[gateway] Config updated: auth.mode=trusted-proxy, trustedProxy=[loopback]`);
+    console.log(`[gateway] Config updated: auth.mode=token, trustedProxies=[loopback], allowInsecureAuth=true`);
   } catch (err) {
     console.error(`[gateway] Failed to update config: ${err.message}`);
   }
 
-  // No --auth flag: gateway reads auth mode from config file (set above to "trusted-proxy").
-  // The CLI only accepts "token" or "password", but config supports "trusted-proxy".
   const args = [
     "gateway",
     "run",
@@ -187,6 +191,10 @@ async function startGateway() {
     "loopback",
     "--port",
     String(INTERNAL_GATEWAY_PORT),
+    "--auth",
+    "token",
+    "--token",
+    OPENCLAW_GATEWAY_TOKEN,
     "--allow-unconfigured",
   ];
 
@@ -586,8 +594,6 @@ function buildOnboardArgs(payload) {
     "loopback",
     "--gateway-port",
     String(INTERNAL_GATEWAY_PORT),
-    // Use "token" for onboard CLI (it doesn't accept "trusted-proxy").
-    // Post-onboard config overwrites auth.mode to "trusted-proxy".
     "--gateway-auth",
     "token",
     "--gateway-token",
@@ -715,7 +721,7 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
     // Post-onboard config + optional channel setup.
     if (ok) {
       // Post-onboard: write gateway config directly to JSON file.
-      // This is more reliable than `config set` for nested keys like gateway.auth.trustedProxy.
+      // This is more reliable than `config set` for nested keys.
       try {
         const cfgPath = configPath();
         const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
@@ -726,10 +732,14 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
         cfg.gateway.port = INTERNAL_GATEWAY_PORT;
         cfg.gateway.trustedProxies = ["127.0.0.1", "::1"];
         cfg.gateway.auth = cfg.gateway.auth || {};
-        cfg.gateway.auth.mode = "trusted-proxy";
-        cfg.gateway.auth.trustedProxy = {
-          userHeader: "x-forwarded-user",
-        };
+        cfg.gateway.auth.mode = "token";
+        cfg.gateway.auth.token = OPENCLAW_GATEWAY_TOKEN;
+        // Remove stale trusted-proxy config if present
+        delete cfg.gateway.auth.trustedProxy;
+
+        // Allow Control UI connections over plain HTTP
+        cfg.gateway.controlUi = cfg.gateway.controlUi || {};
+        cfg.gateway.controlUi.allowInsecureAuth = true;
 
         // Disable automatic plugin activation for security
         cfg.plugins = cfg.plugins || {};
@@ -744,7 +754,7 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
         }
 
         fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2), "utf8");
-        console.log("[onboard] Config updated: auth.mode=trusted-proxy, trustedProxy=[loopback], plugins.autoEnable=false");
+        console.log("[onboard] Config updated: auth.mode=token, trustedProxies=[loopback], allowInsecureAuth=true, plugins.autoEnable=false");
       } catch (err) {
         console.error(`[onboard] Failed to update config: ${err.message}`);
         extra += `\n[ERROR] Failed to update config: ${err.message}\n`;
@@ -1021,12 +1031,11 @@ proxy.on("error", (err, _req, _res) => {
   console.error("[proxy]", err);
 });
 
-// In trusted-proxy mode, inject x-forwarded-user header so the gateway identifies
-// the user. The gateway checks: (1) request from trustedProxies IP, (2) userHeader present.
-const PROXY_USER = "admin@railway-wrapper";
-
+// Inject bearer token into proxied requests so browser clients don't need to know it.
+// Uses http-proxy event handler because direct req.headers modification doesn't work
+// reliably for WebSocket upgrades.
 proxy.on("proxyReq", (proxyReq) => {
-  proxyReq.setHeader("x-forwarded-user", PROXY_USER);
+  proxyReq.setHeader("Authorization", `Bearer ${OPENCLAW_GATEWAY_TOKEN}`);
 });
 
 app.use(async (req, res) => {
@@ -1049,7 +1058,6 @@ app.use(async (req, res) => {
     }
   }
 
-  // Proxy to gateway (trusted-proxy mode: no token injection needed)
   return proxy.web(req, res, { target: GATEWAY_TARGET });
 });
 
@@ -1079,10 +1087,9 @@ server.on("upgrade", async (req, socket, head) => {
     return;
   }
 
-  // trusted-proxy mode: inject x-forwarded-user for WebSocket upgrades
   proxy.ws(req, socket, head, {
     target: GATEWAY_TARGET,
-    headers: { "x-forwarded-user": PROXY_USER },
+    headers: { Authorization: `Bearer ${OPENCLAW_GATEWAY_TOKEN}` },
   });
 });
 
