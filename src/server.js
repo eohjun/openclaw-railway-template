@@ -154,11 +154,15 @@ async function startGateway() {
     const cfgPath = configPath();
     const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
 
-    // trusted-proxy mode: connections from trustedProxy addresses are implicitly authenticated
+    // trusted-proxy mode: connections from trustedProxies are implicitly authenticated.
+    // trustedProxies is a top-level gateway array; trustedProxy under auth is an object with userHeader.
     cfg.gateway = cfg.gateway || {};
+    cfg.gateway.trustedProxies = ["127.0.0.1", "::1"];
     cfg.gateway.auth = cfg.gateway.auth || {};
     cfg.gateway.auth.mode = "trusted-proxy";
-    cfg.gateway.auth.trustedProxy = ["127.0.0.1", "::1"];
+    cfg.gateway.auth.trustedProxy = {
+      userHeader: "x-forwarded-user",
+    };
 
     // Ensure hooks.token differs from gateway.auth.token (GHSA-76m6-pj3w-v7mf)
     const hooksToken = cfg?.hooks?.token;
@@ -720,9 +724,12 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
         cfg.gateway.mode = "local";
         cfg.gateway.bind = "loopback";
         cfg.gateway.port = INTERNAL_GATEWAY_PORT;
+        cfg.gateway.trustedProxies = ["127.0.0.1", "::1"];
         cfg.gateway.auth = cfg.gateway.auth || {};
         cfg.gateway.auth.mode = "trusted-proxy";
-        cfg.gateway.auth.trustedProxy = ["127.0.0.1", "::1"];
+        cfg.gateway.auth.trustedProxy = {
+          userHeader: "x-forwarded-user",
+        };
 
         // Disable automatic plugin activation for security
         cfg.plugins = cfg.plugins || {};
