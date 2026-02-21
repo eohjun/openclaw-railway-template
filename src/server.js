@@ -118,7 +118,7 @@ function sleep(ms) {
 }
 
 async function waitForGatewayReady(opts = {}) {
-  const timeoutMs = opts.timeoutMs ?? 20_000;
+  const timeoutMs = opts.timeoutMs ?? 60_000;
   const start = Date.now();
   const endpoints = ["/openclaw", "/", "/health"];
   
@@ -259,7 +259,7 @@ async function ensureGatewayRunning() {
   if (!gatewayStarting) {
     gatewayStarting = (async () => {
       await startGateway();
-      const ready = await waitForGatewayReady({ timeoutMs: 20_000 });
+      const ready = await waitForGatewayReady({ timeoutMs: 60_000 });
       if (!ready) {
         throw new Error("Gateway did not become ready in time");
       }
