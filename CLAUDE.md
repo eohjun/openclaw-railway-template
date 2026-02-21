@@ -27,6 +27,9 @@ npm run lint
 
 # Local smoke test (requires Docker)
 npm run smoke
+
+# Remote smoke test (deployed instance)
+SMOKE_URL=https://your-app.up.railway.app npm run smoke:remote
 ```
 
 ## Docker Build & Local Testing
