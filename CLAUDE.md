@@ -58,7 +58,7 @@ open http://localhost:8080/setup  # password: test
 
 2. **Wrapper → Gateway** (localhost:18789 by default)
    - HTTP/WebSocket reverse proxy via `http-proxy`
-   - Automatically injects `Authorization: Bearer <token>` header
+   - Gateway runs in `trusted-proxy` auth mode; loopback connections are implicitly authenticated
 
 ### Lifecycle States
 
@@ -69,7 +69,7 @@ open http://localhost:8080/setup  # password: test
 2. **Configured**: `openclaw.json` exists
    - Gateway starts eagerly at boot (not lazily on first request)
    - While gateway is starting, requests get a loading page (`loading.html`, auto-refreshes)
-   - Once ready, proxies all traffic with injected bearer token
+   - Once ready, proxies all traffic (trusted-proxy mode, no token injection needed)
 
 ### Key Files
 
@@ -95,7 +95,7 @@ open http://localhost:8080/setup  # password: test
 
 **Optional:**
 
-- `OPENCLAW_GATEWAY_TOKEN` — auth token for gateway (auto-generated if unset)
+- `OPENCLAW_GATEWAY_TOKEN` — token used for hooks.token collision avoidance (auto-generated if unset; no longer injected into proxy requests)
 - `PORT` — wrapper HTTP port (default 8080)
 - `INTERNAL_GATEWAY_PORT` — gateway internal port (default 18789)
 - `OPENCLAW_ENTRY` — path to `entry.js` (default `/openclaw/dist/entry.js`)
@@ -106,45 +106,30 @@ open http://localhost:8080/setup  # password: test
 The wrapper manages a **two-layer auth scheme**:
 
 1. **Setup wizard auth**: Basic auth with `SETUP_PASSWORD`, timing-safe comparison, rate-limited (50 req/min per IP)
-2. **Gateway auth**: Bearer token with multi-source resolution and automatic sync
-   - **Token resolution order** (src/server.js:31-69):
-     1. `OPENCLAW_GATEWAY_TOKEN` env variable (highest priority) ✅
-     2. Persisted file at `${STATE_DIR}/gateway.token`
-     3. Generate new random token and persist
-   - **Token synchronization**:
-     - During onboarding: Synced to `openclaw.json` with verification (src/server.js:610-656)
-     - Every gateway start: Synced to `openclaw.json` with verification (src/server.js:148-189)
-     - Reason: Openclaw gateway reads token from config file, not from `--token` flag
-   - **Token injection**:
-     - HTTP requests: via `proxy.on("proxyReq")` event handler (src/server.js:958)
-     - WebSocket upgrades: via `proxy.on("proxyReqWs")` event handler (src/server.js:964)
+2. **Gateway auth**: `trusted-proxy` mode with loopback trust
+   - Gateway runs with `--auth trusted-proxy` and `trustedProxies=["127.0.0.1","::1"]`
+   - Connections from trusted proxy addresses are implicitly authenticated (no bearer token needed)
+   - No token injection into HTTP or WebSocket proxy requests
+   - `resolveGatewayToken()` still runs to provide a stable token for hooks.token collision avoidance (GHSA-76m6-pj3w-v7mf)
 
 ### Onboarding Process
 
 When the user runs setup (src/server.js:554-830):
 
-1. Calls `openclaw onboard --non-interactive` with user-selected auth provider and `--gateway-token` flag
-2. **Syncs wrapper token to `openclaw.json`** (overwrites whatever `onboard` generated):
-   - Sets `gateway.auth.token` to `OPENCLAW_GATEWAY_TOKEN` env variable
-   - Verifies sync succeeded by reading config file back
-   - Logs warning/error if mismatch detected
+1. Calls `openclaw onboard --non-interactive` with user-selected auth provider and `--gateway-auth trusted-proxy`
+2. Sets gateway config: `auth.mode=trusted-proxy`, `trustedProxies=["127.0.0.1","::1"]`, `bind=loopback`
 3. Writes channel configs (Telegram/Discord/Slack/IRC) directly to `openclaw.json` via `openclaw config set --json`
-4. Force-sets gateway config to use token auth + loopback bind + allowInsecureAuth + plugins.autoEnable=false
+4. Sets `plugins.autoEnable=false` for security
 5. Restarts gateway process to apply all config changes
 6. Waits for gateway readiness (polls multiple endpoints)
 
 **Important**: Channel setup bypasses `openclaw channels add` and writes config directly because `channels add` is flaky across different Openclaw builds.
 
-### Gateway Token Injection
+### Gateway Trusted-Proxy Mode
 
-The wrapper **always** injects the bearer token into proxied requests so browser clients don't need to know it:
+The gateway runs in `trusted-proxy` auth mode. Connections originating from addresses listed in `trustedProxies` (loopback: `127.0.0.1`, `::1`) are implicitly authenticated — no bearer token injection is needed for HTTP or WebSocket proxy requests.
 
-- HTTP requests: via `proxy.on("proxyReq")` event handler (src/server.js:958)
-- WebSocket upgrades: via `proxy.on("proxyReqWs")` event handler (src/server.js:964)
-
-**Important**: Token injection uses `http-proxy` event handlers (`proxyReq` and `proxyReqWs`) rather than direct `req.headers` modification. Direct header modification does not reliably work with WebSocket upgrades, causing intermittent `token_missing` or `token_mismatch` errors.
-
-This allows the Control UI at `/openclaw` to work without user authentication.
+This allows the Control UI at `/openclaw` to work without user authentication or device pairing.
 
 ### Backup Export
 
@@ -165,7 +150,7 @@ This allows the Control UI at `/openclaw` to work without user authentication.
 ### Testing authentication
 
 - Setup wizard: Clear browser auth, verify Basic auth challenge
-- Gateway: Remove `Authorization` header injection (src/server.js:958) and verify requests fail
+- Gateway: Verify trusted-proxy mode by checking that `gateway.auth.mode` is `trusted-proxy` and `trustedProxies` includes loopback addresses in `openclaw.json`
 
 ### Debugging gateway startup
 
@@ -179,7 +164,7 @@ If gateway doesn't start:
 
 - Verify `openclaw.json` exists and is valid JSON
 - Check `STATE_DIR` and `WORKSPACE_DIR` are writable
-- Ensure bearer token is set in config
+- Ensure `gateway.auth.mode` is `trusted-proxy` and `trustedProxies` is set in config
 
 ### Modifying onboarding args
 
@@ -222,13 +207,13 @@ This avoids repeatedly reading large files and provides instant context about th
 
 ## Quirks & Gotchas
 
-1. **Gateway token must be stable across redeploys** → Always set `OPENCLAW_GATEWAY_TOKEN` env variable in Railway (highest priority); token is synced to `openclaw.json` during onboarding (src/server.js:610-656) and on every gateway start (src/server.js:148-189) with verification. This is required because `openclaw onboard` generates its own random token and the gateway reads from config file, not from `--token` CLI flag. Sync failures throw errors and prevent gateway startup.
+1. **Gateway uses trusted-proxy auth mode** → No bearer token injection needed. The gateway trusts connections from loopback addresses (`127.0.0.1`, `::1`). `OPENCLAW_GATEWAY_TOKEN` env variable is still resolved for hooks.token collision avoidance but is not synced to config or injected into proxy requests.
 2. **Channels are written via `config set --json`, not `channels add`** → avoids CLI version incompatibilities
 3. **Gateway readiness check polls multiple endpoints** (`/openclaw`, `/`, `/health`) → some builds only expose certain routes (src/server.js:119)
 4. **Discord bots require MESSAGE CONTENT INTENT** → documented in setup wizard (src/public/setup.html)
 5. **Gateway spawn inherits stdio** → logs appear in wrapper output (src/server.js:206)
-6. **WebSocket auth requires proxy event handlers** → Direct `req.headers` modification doesn't work for WebSocket upgrades with http-proxy; must use `proxyReqWs` event (src/server.js:964) to reliably inject Authorization header
-7. **Control UI requires allowInsecureAuth + trustedProxies** → `gateway.controlUi.allowInsecureAuth=true` and `gateway.trustedProxies=["127.0.0.1","::1"]` are set during onboarding AND re-applied on every gateway start (doctor migrations can reset config). v2026.2.21+ rejects proxy headers from untrusted addresses, causing "disconnected (1008): pairing required" errors. Without `trustedProxies`, the gateway doesn't treat loopback-proxied connections as local.
+6. **No token injection in proxy** → With `trusted-proxy` auth mode, the wrapper does not inject any Authorization header into HTTP or WebSocket proxy requests. The gateway implicitly trusts loopback connections.
+7. **Control UI requires trusted-proxy + trustedProxies** → `gateway.auth.mode=trusted-proxy` and `gateway.trustedProxies=["127.0.0.1","::1"]` are set during onboarding AND re-applied on every gateway start (doctor migrations can reset config). `allowInsecureAuth` is no longer used (hardened in v2026.2.19). Without `trustedProxies`, the gateway rejects proxy headers from untrusted addresses, causing "disconnected (1008): pairing required" errors.
 8. **Gateway `--allow-unconfigured` flag** → Added to gateway spawn args to support latest openclaw builds that require explicit opt-in for unconfigured state. Ignored by older builds.
 9. **Discord `dm` key renamed to `direct`** → Latest openclaw renamed the session key from `dm` to `direct` (with backward compat layer). Wrapper uses `direct` for forward compatibility.
 10. **Supported auth providers** → OpenAI, Anthropic, Chutes (OAuth), vLLM (OAuth), Google, OpenRouter, Vercel AI Gateway, Moonshot AI (Kimi K2.5), Z.AI (multiple endpoint variants), MiniMax (M2.5 + OAuth + CN endpoint), Qwen, Copilot, Synthetic, OpenCode Zen, LiteLLM, xAI (Grok), Qianfan, Xiaomi, Venice AI, Together AI, Hugging Face, Cloudflare AI Gateway, Custom Provider, Volcano Engine (Doubao), BytePlus. Flag mappings in `buildOnboardArgs()`.

@@ -148,57 +148,12 @@ async function startGateway() {
   fs.mkdirSync(STATE_DIR, { recursive: true });
   fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
 
-  // Sync wrapper token to openclaw.json before every gateway start.
-  // This ensures the gateway's config-file token matches what the wrapper injects via proxy.
-  console.log(`[gateway] ========== GATEWAY START TOKEN SYNC ==========`);
-  console.log(`[gateway] Syncing wrapper token to config: ${OPENCLAW_GATEWAY_TOKEN.slice(0, 16)}... (len: ${OPENCLAW_GATEWAY_TOKEN.length})`);
-
-  const syncResult = await runCmd(
-    OPENCLAW_NODE,
-    clawArgs(["config", "set", "gateway.auth.token", OPENCLAW_GATEWAY_TOKEN]),
-  );
-
-  console.log(`[gateway] Sync result: exit code ${syncResult.code}`);
-  if (syncResult.output?.trim()) {
-    console.log(`[gateway] Sync output: ${syncResult.output}`);
-  }
-
-  if (syncResult.code !== 0) {
-    console.error(`[gateway] ⚠️  WARNING: Token sync failed with code ${syncResult.code}`);
-  }
-
-  // Verify sync succeeded
-  try {
-    const config = JSON.parse(fs.readFileSync(configPath(), "utf8"));
-    const configToken = config?.gateway?.auth?.token;
-
-    console.log(`[gateway] Token verification:`);
-    console.log(`[gateway]   Wrapper: ${OPENCLAW_GATEWAY_TOKEN.slice(0, 16)}... (len: ${OPENCLAW_GATEWAY_TOKEN.length})`);
-    console.log(`[gateway]   Config:  ${configToken?.slice(0, 16)}... (len: ${configToken?.length || 0})`);
-
-    if (configToken !== OPENCLAW_GATEWAY_TOKEN) {
-      console.error(`[gateway] ✗ Token mismatch detected!`);
-      debug(`[gateway]   Full wrapper: ${OPENCLAW_GATEWAY_TOKEN}`);
-      debug(`[gateway]   Full config:  ${configToken || 'null'}`);
-      throw new Error(
-        `Token mismatch: wrapper has ${OPENCLAW_GATEWAY_TOKEN.slice(0, 16)}... but config has ${(configToken || 'null')?.slice?.(0, 16)}...`
-      );
-    }
-    console.log(`[gateway] ✓ Token verification PASSED`);
-  } catch (err) {
-    console.error(`[gateway] ERROR: Token verification failed: ${err}`);
-    throw err; // Don't start gateway with mismatched token
-  }
-
-  console.log(`[gateway] ========== TOKEN SYNC COMPLETE ==========`);
-
   // Re-apply gateway config on every start (doctor migrations can reset config)
+  // trusted-proxy mode: connections from trustedProxies are implicitly authenticated
   await runCmd(
     OPENCLAW_NODE,
-    clawArgs(["config", "set", "gateway.controlUi.allowInsecureAuth", "true"]),
+    clawArgs(["config", "set", "gateway.auth.mode", "trusted-proxy"]),
   );
-  // Trust the wrapper's loopback proxy so the gateway treats connections as local
-  // (v2026.2.21+ rejects proxy headers from untrusted addresses, causing pairing errors)
   await runCmd(
     OPENCLAW_NODE,
     clawArgs(["config", "set", "--json", "gateway.trustedProxies", JSON.stringify(["127.0.0.1", "::1"])]),
@@ -228,9 +183,7 @@ async function startGateway() {
     "--port",
     String(INTERNAL_GATEWAY_PORT),
     "--auth",
-    "token",
-    "--token",
-    OPENCLAW_GATEWAY_TOKEN,
+    "trusted-proxy",
     "--allow-unconfigured",
   ];
 
@@ -631,9 +584,7 @@ function buildOnboardArgs(payload) {
     "--gateway-port",
     String(INTERNAL_GATEWAY_PORT),
     "--gateway-auth",
-    "token",
-    "--gateway-token",
-    OPENCLAW_GATEWAY_TOKEN,
+    "trusted-proxy",
     "--flow",
     payload.flow || "quickstart",
   ];
@@ -746,11 +697,7 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
     const payload = req.body || {};
     const onboardArgs = buildOnboardArgs(payload);
 
-    // DIAGNOSTIC: Log token we're passing to onboard
-    console.log(`[onboard] ========== TOKEN DIAGNOSTIC START ==========`);
-    console.log(`[onboard] Wrapper token (from env/file/generated): ${OPENCLAW_GATEWAY_TOKEN.slice(0, 16)}... (length: ${OPENCLAW_GATEWAY_TOKEN.length})`);
-    console.log(`[onboard] Onboard command args include: --gateway-token ${OPENCLAW_GATEWAY_TOKEN.slice(0, 16)}...`);
-    console.log(`[onboard] Full onboard command: node ${clawArgs(onboardArgs).join(' ').replace(OPENCLAW_GATEWAY_TOKEN, OPENCLAW_GATEWAY_TOKEN.slice(0, 16) + '...')}`);
+    console.log(`[onboard] Running: ${OPENCLAW_NODE} ${clawArgs(onboardArgs).join(' ')}`);
 
     const onboard = await runCmd(OPENCLAW_NODE, clawArgs(onboardArgs));
 
@@ -758,84 +705,14 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
 
     const ok = onboard.code === 0 && isConfigured();
 
-    // DIAGNOSTIC: Check what token onboard actually wrote to config
+    // Post-onboard config + optional channel setup.
     if (ok) {
-      try {
-        const configAfterOnboard = JSON.parse(fs.readFileSync(configPath(), "utf8"));
-        const tokenAfterOnboard = configAfterOnboard?.gateway?.auth?.token;
-        console.log(`[onboard] Token in config AFTER onboard: ${tokenAfterOnboard?.slice(0, 16)}... (length: ${tokenAfterOnboard?.length || 0})`);
-        console.log(`[onboard] Token match: ${tokenAfterOnboard === OPENCLAW_GATEWAY_TOKEN ? '✓ MATCHES' : '✗ MISMATCH!'}`);
-        if (tokenAfterOnboard !== OPENCLAW_GATEWAY_TOKEN) {
-          console.log(`[onboard] ⚠️  PROBLEM: onboard command ignored --gateway-token flag and wrote its own token!`);
-          extra += `\n[WARNING] onboard wrote different token than expected\n`;
-          extra += `  Expected: ${OPENCLAW_GATEWAY_TOKEN.slice(0, 16)}...\n`;
-          extra += `  Got:      ${tokenAfterOnboard?.slice(0, 16)}...\n`;
-        }
-      } catch (err) {
-        console.error(`[onboard] Could not check config after onboard: ${err}`);
-      }
-    }
-
-    // Optional channel setup (only after successful onboarding, and only if the installed CLI supports it).
-    if (ok) {
-      // Ensure gateway token is written into config so the browser UI can authenticate reliably.
-      // (We also enforce loopback bind since the wrapper proxies externally.)
-      console.log(`[onboard] Now syncing wrapper token to config (${OPENCLAW_GATEWAY_TOKEN.slice(0, 8)}...)`);
-
+      // Set gateway to trusted-proxy auth mode (connections from trustedProxies are implicitly authenticated)
       await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.mode", "local"]));
       await runCmd(
         OPENCLAW_NODE,
-        clawArgs(["config", "set", "gateway.auth.mode", "token"]),
+        clawArgs(["config", "set", "gateway.auth.mode", "trusted-proxy"]),
       );
-
-      const setTokenResult = await runCmd(
-        OPENCLAW_NODE,
-        clawArgs([
-          "config",
-          "set",
-          "gateway.auth.token",
-          OPENCLAW_GATEWAY_TOKEN,
-        ]),
-      );
-
-      console.log(`[onboard] config set gateway.auth.token result: exit code ${setTokenResult.code}`);
-      if (setTokenResult.output?.trim()) {
-        console.log(`[onboard] config set output: ${setTokenResult.output}`);
-      }
-
-      if (setTokenResult.code !== 0) {
-        console.error(`[onboard] ⚠️  WARNING: config set gateway.auth.token failed with code ${setTokenResult.code}`);
-        extra += `\n[WARNING] Failed to set gateway token in config: ${setTokenResult.output}\n`;
-      }
-
-      // Verify the token was actually written to config
-      try {
-        const configContent = fs.readFileSync(configPath(), "utf8");
-        const config = JSON.parse(configContent);
-        const configToken = config?.gateway?.auth?.token;
-
-        console.log(`[onboard] Token verification after sync:`);
-        console.log(`[onboard]   Wrapper token: ${OPENCLAW_GATEWAY_TOKEN.slice(0, 16)}... (len: ${OPENCLAW_GATEWAY_TOKEN.length})`);
-        console.log(`[onboard]   Config token:  ${configToken?.slice(0, 16)}... (len: ${configToken?.length || 0})`);
-
-        if (configToken !== OPENCLAW_GATEWAY_TOKEN) {
-          console.error(`[onboard] ✗ ERROR: Token mismatch after config set!`);
-          debug(`[onboard]   Full wrapper token: ${OPENCLAW_GATEWAY_TOKEN}`);
-          debug(`[onboard]   Full config token:  ${configToken || 'null'}`);
-          extra += `\n[ERROR] Token verification failed! Config has different token than wrapper.\n`;
-          extra += `  Wrapper: ${OPENCLAW_GATEWAY_TOKEN.slice(0, 16)}...\n`;
-          extra += `  Config:  ${configToken?.slice(0, 16)}...\n`;
-        } else {
-          console.log(`[onboard] ✓ Token verification PASSED - tokens match!`);
-          extra += `\n[onboard] ✓ Gateway token synced successfully\n`;
-        }
-      } catch (err) {
-        console.error(`[onboard] ERROR: Could not verify token in config: ${err}`);
-        extra += `\n[ERROR] Could not verify token: ${String(err)}\n`;
-      }
-
-      console.log(`[onboard] ========== TOKEN DIAGNOSTIC END ==========`);
-
       await runCmd(
         OPENCLAW_NODE,
         clawArgs(["config", "set", "gateway.bind", "loopback"]),
@@ -848,11 +725,6 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
           "gateway.port",
           String(INTERNAL_GATEWAY_PORT),
         ]),
-      );
-      // Allow Control UI access without device pairing (fixes error 1008: pairing required)
-      await runCmd(
-        OPENCLAW_NODE,
-        clawArgs(["config", "set", "gateway.controlUi.allowInsecureAuth", "true"]),
       );
       // Trust the wrapper's loopback proxy so the gateway treats connections as local
       await runCmd(
@@ -1153,17 +1025,8 @@ proxy.on("error", (err, _req, _res) => {
   console.error("[proxy]", err);
 });
 
-// Inject auth token into HTTP proxy requests
-proxy.on("proxyReq", (proxyReq, req) => {
-  debug(`[proxy] HTTP ${req.method} ${req.url} - injecting token: ${OPENCLAW_GATEWAY_TOKEN.slice(0, 16)}...`);
-  proxyReq.setHeader("Authorization", `Bearer ${OPENCLAW_GATEWAY_TOKEN}`);
-});
-
-// Log WebSocket upgrade proxy events (token is injected via headers option in server.on("upgrade"))
-proxy.on("proxyReqWs", (proxyReq, req) => {
-  debug(`[proxy-event] WebSocket proxyReqWs event fired for ${req.url}`);
-  debug(`[proxy-event] Headers:`, JSON.stringify(proxyReq.getHeaders()));
-});
+// In trusted-proxy mode, no Authorization header injection is needed.
+// The gateway implicitly trusts connections from addresses in trustedProxies.
 
 app.use(async (req, res) => {
   // If not configured, force users to /setup for any non-setup routes.
@@ -1185,7 +1048,7 @@ app.use(async (req, res) => {
     }
   }
 
-  // Proxy to gateway (auth token injected via proxyReq event)
+  // Proxy to gateway (trusted-proxy mode: no token injection needed)
   return proxy.web(req, res, { target: GATEWAY_TARGET });
 });
 
@@ -1215,15 +1078,8 @@ server.on("upgrade", async (req, socket, head) => {
     return;
   }
 
-  // Inject auth token via headers option (req.headers modification doesn't work for WS)
-  debug(`[ws-upgrade] Proxying WebSocket upgrade with token: ${OPENCLAW_GATEWAY_TOKEN.slice(0, 16)}...`);
-
-  proxy.ws(req, socket, head, {
-    target: GATEWAY_TARGET,
-    headers: {
-      Authorization: `Bearer ${OPENCLAW_GATEWAY_TOKEN}`,
-    },
-  });
+  // trusted-proxy mode: no token injection needed for WebSocket upgrades
+  proxy.ws(req, socket, head, { target: GATEWAY_TARGET });
 });
 
 process.on("SIGTERM", () => {
