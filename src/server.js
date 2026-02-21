@@ -192,10 +192,16 @@ async function startGateway() {
 
   console.log(`[gateway] ========== TOKEN SYNC COMPLETE ==========`);
 
-  // Re-apply allowInsecureAuth on every start (doctor migrations can reset config)
+  // Re-apply gateway config on every start (doctor migrations can reset config)
   await runCmd(
     OPENCLAW_NODE,
     clawArgs(["config", "set", "gateway.controlUi.allowInsecureAuth", "true"]),
+  );
+  // Trust the wrapper's loopback proxy so the gateway treats connections as local
+  // (v2026.2.21+ rejects proxy headers from untrusted addresses, causing pairing errors)
+  await runCmd(
+    OPENCLAW_NODE,
+    clawArgs(["config", "set", "--json", "gateway.trustedProxies", JSON.stringify(["127.0.0.1", "::1"])]),
   );
 
   // Ensure hooks.token differs from gateway.auth.token (GHSA-76m6-pj3w-v7mf)
@@ -847,6 +853,11 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
       await runCmd(
         OPENCLAW_NODE,
         clawArgs(["config", "set", "gateway.controlUi.allowInsecureAuth", "true"]),
+      );
+      // Trust the wrapper's loopback proxy so the gateway treats connections as local
+      await runCmd(
+        OPENCLAW_NODE,
+        clawArgs(["config", "set", "--json", "gateway.trustedProxies", JSON.stringify(["127.0.0.1", "::1"])]),
       );
 
       // Disable automatic plugin activation for security
