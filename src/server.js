@@ -175,6 +175,8 @@ async function startGateway() {
     console.log(`[gateway] Could not check hooks token segregation: ${err.message}`);
   }
 
+  // No --auth flag: gateway reads auth mode from config file (set above to "trusted-proxy").
+  // The CLI only accepts "token" or "password", but config supports "trusted-proxy".
   const args = [
     "gateway",
     "run",
@@ -182,8 +184,6 @@ async function startGateway() {
     "loopback",
     "--port",
     String(INTERNAL_GATEWAY_PORT),
-    "--auth",
-    "trusted-proxy",
     "--allow-unconfigured",
   ];
 
@@ -583,8 +583,12 @@ function buildOnboardArgs(payload) {
     "loopback",
     "--gateway-port",
     String(INTERNAL_GATEWAY_PORT),
+    // Use "token" for onboard CLI (it doesn't accept "trusted-proxy").
+    // Post-onboard config overwrites auth.mode to "trusted-proxy".
     "--gateway-auth",
-    "trusted-proxy",
+    "token",
+    "--gateway-token",
+    OPENCLAW_GATEWAY_TOKEN,
     "--flow",
     payload.flow || "quickstart",
   ];
