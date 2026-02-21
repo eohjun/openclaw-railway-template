@@ -192,6 +192,12 @@ async function startGateway() {
 
   console.log(`[gateway] ========== TOKEN SYNC COMPLETE ==========`);
 
+  // Re-apply allowInsecureAuth on every start (doctor migrations can reset config)
+  await runCmd(
+    OPENCLAW_NODE,
+    clawArgs(["config", "set", "gateway.controlUi.allowInsecureAuth", "true"]),
+  );
+
   // Ensure hooks.token differs from gateway.auth.token (GHSA-76m6-pj3w-v7mf)
   try {
     const cfg = JSON.parse(fs.readFileSync(configPath(), "utf8"));
