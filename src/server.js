@@ -167,8 +167,12 @@ async function startGateway() {
     delete cfg.gateway.auth.trustedProxy;
 
     // Allow Control UI connections over plain HTTP (reverse proxy terminates TLS)
+    // dangerouslyDisableDeviceAuth: bypass device pairing for Control UI WebSocket.
+    // Required because v2026.2.21+ enforces device identity even for token-authenticated
+    // loopback connections. PR #22712 (auto-approve localhost pairing) is still unmerged.
     cfg.gateway.controlUi = cfg.gateway.controlUi || {};
     cfg.gateway.controlUi.allowInsecureAuth = true;
+    cfg.gateway.controlUi.dangerouslyDisableDeviceAuth = true;
 
     // Ensure hooks.token differs from gateway.auth.token (GHSA-76m6-pj3w-v7mf)
     const hooksToken = cfg?.hooks?.token;
@@ -737,9 +741,10 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
         // Remove stale trusted-proxy config if present
         delete cfg.gateway.auth.trustedProxy;
 
-        // Allow Control UI connections over plain HTTP
+        // Allow Control UI connections over plain HTTP + disable device pairing
         cfg.gateway.controlUi = cfg.gateway.controlUi || {};
         cfg.gateway.controlUi.allowInsecureAuth = true;
+        cfg.gateway.controlUi.dangerouslyDisableDeviceAuth = true;
 
         // Disable automatic plugin activation for security
         cfg.plugins = cfg.plugins || {};
