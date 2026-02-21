@@ -1021,8 +1021,13 @@ proxy.on("error", (err, _req, _res) => {
   console.error("[proxy]", err);
 });
 
-// In trusted-proxy mode, no Authorization header injection is needed.
-// The gateway implicitly trusts connections from addresses in trustedProxies.
+// In trusted-proxy mode, inject x-forwarded-user header so the gateway identifies
+// the user. The gateway checks: (1) request from trustedProxies IP, (2) userHeader present.
+const PROXY_USER = "admin@railway-wrapper";
+
+proxy.on("proxyReq", (proxyReq) => {
+  proxyReq.setHeader("x-forwarded-user", PROXY_USER);
+});
 
 app.use(async (req, res) => {
   // If not configured, force users to /setup for any non-setup routes.
@@ -1074,8 +1079,11 @@ server.on("upgrade", async (req, socket, head) => {
     return;
   }
 
-  // trusted-proxy mode: no token injection needed for WebSocket upgrades
-  proxy.ws(req, socket, head, { target: GATEWAY_TARGET });
+  // trusted-proxy mode: inject x-forwarded-user for WebSocket upgrades
+  proxy.ws(req, socket, head, {
+    target: GATEWAY_TARGET,
+    headers: { "x-forwarded-user": PROXY_USER },
+  });
 });
 
 process.on("SIGTERM", () => {
