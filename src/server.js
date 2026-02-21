@@ -120,7 +120,7 @@ function sleep(ms) {
 async function waitForGatewayReady(opts = {}) {
   const timeoutMs = opts.timeoutMs ?? 20_000;
   const start = Date.now();
-  const endpoints = ["/openclaw", "/openclaw", "/", "/health"];
+  const endpoints = ["/openclaw", "/", "/health"];
   
   while (Date.now() - start < timeoutMs) {
     for (const endpoint of endpoints) {
@@ -191,6 +191,22 @@ async function startGateway() {
   }
 
   console.log(`[gateway] ========== TOKEN SYNC COMPLETE ==========`);
+
+  // Ensure hooks.token differs from gateway.auth.token (GHSA-76m6-pj3w-v7mf)
+  try {
+    const cfg = JSON.parse(fs.readFileSync(configPath(), "utf8"));
+    const hooksToken = cfg?.hooks?.token;
+    if (hooksToken && hooksToken === OPENCLAW_GATEWAY_TOKEN) {
+      const newHooksToken = crypto.randomBytes(32).toString("hex");
+      await runCmd(
+        OPENCLAW_NODE,
+        clawArgs(["config", "set", "hooks.token", newHooksToken]),
+      );
+      console.log("[gateway] Regenerated hooks.token to avoid collision (GHSA-76m6-pj3w-v7mf)");
+    }
+  } catch (err) {
+    console.log(`[gateway] Could not check hooks token segregation: ${err.message}`);
+  }
 
   const args = [
     "gateway",
@@ -470,6 +486,23 @@ app.get("/setup/api/status", requireSetupAuth, async (_req, res) => {
       ],
     },
     {
+      value: "volcengine",
+      label: "Volcano Engine (Doubao)",
+      hint: "API key (Doubao coding models)",
+      options: [
+        { value: "volcengine-api-key", label: "Volcano Engine API key" },
+        { value: "volcengine-api-key-coding", label: "Volcano Engine Coding API key" },
+      ],
+    },
+    {
+      value: "byteplus",
+      label: "BytePlus",
+      hint: "API key",
+      options: [
+        { value: "byteplus-api-key", label: "BytePlus API key" },
+      ],
+    },
+    {
       value: "copilot",
       label: "Copilot",
       hint: "GitHub + local proxy",
@@ -626,6 +659,9 @@ function buildOnboardArgs(payload) {
       "cloudflare-ai-gateway-api-key": "--cloudflare-ai-gateway-api-key",
       "custom-api-key": "--custom-api-key",
       "minimax-api-key-cn": "--minimax-api-key",
+      "volcengine-api-key": "--volcengine-api-key",
+      "volcengine-api-key-coding": "--volcengine-api-key",
+      "byteplus-api-key": "--byteplus-api-key",
     };
     const flag = map[payload.authChoice];
     if (flag && secret) {
@@ -812,6 +848,22 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
         OPENCLAW_NODE,
         clawArgs(["config", "set", "plugins.autoEnable", "false"]),
       );
+
+      // Ensure hooks.token differs from gateway.auth.token (GHSA-76m6-pj3w-v7mf)
+      try {
+        const cfg = JSON.parse(fs.readFileSync(configPath(), "utf8"));
+        const hooksToken = cfg?.hooks?.token;
+        if (hooksToken && hooksToken === OPENCLAW_GATEWAY_TOKEN) {
+          const newHooksToken = crypto.randomBytes(32).toString("hex");
+          await runCmd(
+            OPENCLAW_NODE,
+            clawArgs(["config", "set", "hooks.token", newHooksToken]),
+          );
+          console.log("[onboard] Regenerated hooks.token to avoid collision with gateway token");
+        }
+      } catch (err) {
+        console.log(`[onboard] Could not check hooks token segregation: ${err.message}`);
+      }
 
       const channelsHelp = await runCmd(
         OPENCLAW_NODE,

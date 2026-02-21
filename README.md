@@ -52,7 +52,7 @@ Then:
 
 ## Supported auth providers
 
-OpenAI (Codex OAuth, API key), Anthropic (Claude Code CLI, setup-token, API key), Google (Gemini API key, Antigravity OAuth, Gemini CLI), OpenRouter, Vercel AI Gateway, Moonshot AI (Kimi K2/Kimi Code), Z.AI (GLM 4.7), MiniMax (M2.1/M2.1 Lightning), Qwen (OAuth), GitHub Copilot (device login, local proxy), Synthetic, OpenCode Zen, LiteLLM, xAI (Grok), Baidu Qianfan.
+OpenAI (Codex OAuth, API key), Anthropic (Claude Code CLI, setup-token, API key), Google (Gemini API key, Antigravity OAuth, Gemini CLI), OpenRouter, Vercel AI Gateway, Moonshot AI (Kimi K2/Kimi Code), Z.AI (GLM 4.7), MiniMax (M2.1/M2.1 Lightning), Qwen (OAuth), GitHub Copilot (device login, local proxy), Synthetic, OpenCode Zen, LiteLLM, xAI (Grok), Baidu Qianfan, Volcano Engine (Doubao), BytePlus.
 
 ## Getting chat tokens (so you don't have to scramble)
 

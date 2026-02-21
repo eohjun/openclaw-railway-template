@@ -21,7 +21,7 @@ RUN corepack enable
 WORKDIR /openclaw
 
 # Pin to a known ref (tag/branch). If it doesn't exist, fall back to main.
-ARG OPENCLAW_GIT_REF=v2026.2.17
+ARG OPENCLAW_GIT_REF=v2026.2.21
 RUN git clone --depth 1 --branch "${OPENCLAW_GIT_REF}" https://github.com/openclaw/openclaw.git .
 
 # Patch: relax version requirements for packages that may reference unpublished versions.
@@ -103,7 +103,7 @@ RUN printf '%s\n' '#!/usr/bin/env bash' 'exec node /openclaw/dist/entry.js "$@"'
   && chmod +x /usr/local/bin/openclaw
 
 # Cache buster: change this value to force a full rebuild
-ARG CACHE_BUST=2026-02-18
+ARG CACHE_BUST=2026-02-22
 
 COPY src ./src
 

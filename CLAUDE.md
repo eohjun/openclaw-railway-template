@@ -196,7 +196,7 @@ Edit `buildOnboardArgs()` (src/server.js:552-619) to add new CLI flags or auth p
 - Template must mount a volume at `/data`
 - Must set `SETUP_PASSWORD` in Railway Variables
 - Public networking must be enabled (assigns `*.up.railway.app` domain)
-- Openclaw version is pinned via Docker build arg `OPENCLAW_GIT_REF` (default: `v2026.2.17`)
+- Openclaw version is pinned via Docker build arg `OPENCLAW_GIT_REF` (default: `v2026.2.21`)
 
 ## Serena Semantic Coding
 
@@ -231,7 +231,7 @@ This avoids repeatedly reading large files and provides instant context about th
 7. **Control UI requires allowInsecureAuth to bypass pairing** → Set `gateway.controlUi.allowInsecureAuth=true` during onboarding to prevent "disconnected (1008): pairing required" errors (GitHub issue #2284). Wrapper already handles bearer token auth, so device pairing is unnecessary.
 8. **Gateway `--allow-unconfigured` flag** → Added to gateway spawn args to support latest openclaw builds that require explicit opt-in for unconfigured state. Ignored by older builds.
 9. **Discord `dm` key renamed to `direct`** → Latest openclaw renamed the session key from `dm` to `direct` (with backward compat layer). Wrapper uses `direct` for forward compatibility.
-10. **Supported auth providers** → OpenAI, Anthropic, Chutes (OAuth), vLLM (OAuth), Google, OpenRouter, Vercel AI Gateway, Moonshot AI (Kimi K2.5), Z.AI (multiple endpoint variants), MiniMax (M2.5 + OAuth + CN endpoint), Qwen, Copilot, Synthetic, OpenCode Zen, LiteLLM, xAI (Grok), Qianfan, Xiaomi, Venice AI, Together AI, Hugging Face, Cloudflare AI Gateway, Custom Provider. Flag mappings in `buildOnboardArgs()`.
+10. **Supported auth providers** → OpenAI, Anthropic, Chutes (OAuth), vLLM (OAuth), Google, OpenRouter, Vercel AI Gateway, Moonshot AI (Kimi K2.5), Z.AI (multiple endpoint variants), MiniMax (M2.5 + OAuth + CN endpoint), Qwen, Copilot, Synthetic, OpenCode Zen, LiteLLM, xAI (Grok), Qianfan, Xiaomi, Venice AI, Together AI, Hugging Face, Cloudflare AI Gateway, Custom Provider, Volcano Engine (Doubao), BytePlus. Flag mappings in `buildOnboardArgs()`.
 11. **IRC channel support** → Setup wizard supports IRC server/nick/channels/password configuration via `config set --json channels.irc`.
 12. **Feishu/Lark moved to community plugin** → No longer built-in; users must install `clawdbot-feishu` from the plugin registry.
 13. **DO NOT use `USER node` in Dockerfile** → Railway 볼륨(`/data`)은 root 소유이며, non-root 사용자로 전환하면 기존 config/data 파일 접근 불가. `entrypoint.sh`의 `chown` 우회도 실패함. Railway 컨테이너는 격리 환경이므로 root 실행 유지.
@@ -245,3 +245,4 @@ This avoids repeatedly reading large files and provides instant context about th
 21. **Custom Provider support** → v2026.2.15 added `custom-api-key` auth choice with `--custom-base-url`, `--custom-model-id`, `--custom-provider-id`, and `--custom-compatibility` (openai/anthropic) flags. The setup wizard shows extra fields when Custom Provider is selected.
 22. **Skill-enabling binaries in container** → `gh` (GitHub CLI), `ffmpeg`, `tmux` installed in the runtime image to unlock `github`, `video-frames`, `tmux` skills respectively. Skills also depend on env vars (`GEMINI_API_KEY`, `NOTION_API_KEY`, `OPENAI_API_KEY`, etc.) and tool policy settings.
 23. **Optional Chromium pre-install** → Build with `--build-arg OPENCLAW_INSTALL_BROWSER=true` to pre-install Chromium + Xvfb (~300MB) into the image. Avoids the 60-90s runtime Playwright install on first browser skill use. Disabled by default to keep image size small.
+24. **Hooks token must differ from gateway token** → v2026.2.21+ refuses to start if `hooks.token` matches `gateway.auth.token` (GHSA-76m6-pj3w-v7mf). The wrapper checks for and fixes collisions during onboarding and on every gateway start.
