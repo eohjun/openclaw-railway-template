@@ -184,6 +184,17 @@ async function startGateway() {
 
     fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2), "utf8");
     console.log(`[gateway] Config updated: auth.mode=token, trustedProxies=[loopback], allowInsecureAuth=true`);
+
+    // Verify config was written correctly (catch silent write failures or race conditions)
+    const verifyConfig = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+    const uiCfg = verifyConfig?.gateway?.controlUi || {};
+    if (!uiCfg.dangerouslyDisableDeviceAuth || !uiCfg.allowInsecureAuth) {
+      console.error("[gateway] CRITICAL: Control UI config verification failed — dangerouslyDisableDeviceAuth=%s, allowInsecureAuth=%s",
+        uiCfg.dangerouslyDisableDeviceAuth, uiCfg.allowInsecureAuth);
+    } else {
+      console.log("[gateway] Control UI config verified: dangerouslyDisableDeviceAuth=%s, allowInsecureAuth=%s, trustedProxies=%j",
+        uiCfg.dangerouslyDisableDeviceAuth, uiCfg.allowInsecureAuth, verifyConfig?.gateway?.trustedProxies);
+    }
   } catch (err) {
     console.error(`[gateway] Failed to update config: ${err.message}`);
   }
@@ -792,7 +803,7 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
             clawArgs([
               "config",
               "set",
-              "--json",
+              "--strict-json",
               "channels.telegram",
               JSON.stringify(cfgObj),
             ]),
@@ -825,7 +836,7 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
             clawArgs([
               "config",
               "set",
-              "--json",
+              "--strict-json",
               "channels.discord",
               JSON.stringify(cfgObj),
             ]),
@@ -854,7 +865,7 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
             clawArgs([
               "config",
               "set",
-              "--json",
+              "--strict-json",
               "channels.slack",
               JSON.stringify(cfgObj),
             ]),
@@ -888,7 +899,7 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
             clawArgs([
               "config",
               "set",
-              "--json",
+              "--strict-json",
               "channels.irc",
               JSON.stringify(cfgObj),
             ]),

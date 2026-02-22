@@ -127,7 +127,7 @@ When the user runs setup (src/server.js:554-830):
 2. **Syncs wrapper token to `openclaw.json`** via direct JSON file write (overwrites whatever `onboard` generated):
    - Sets `gateway.auth.mode` to `"token"`, `gateway.auth.token` to `OPENCLAW_GATEWAY_TOKEN`
    - Sets `gateway.trustedProxies`, `gateway.controlUi.allowInsecureAuth`
-3. Writes channel configs (Telegram/Discord/Slack/IRC) directly to `openclaw.json` via `openclaw config set --json`
+3. Writes channel configs (Telegram/Discord/Slack/IRC) directly to `openclaw.json` via `openclaw config set --strict-json`
 4. Sets `plugins.autoEnable=false` for security
 5. Restarts gateway process to apply all config changes
 6. Waits for gateway readiness (polls multiple endpoints)
@@ -222,7 +222,7 @@ This avoids repeatedly reading large files and provides instant context about th
 ## Quirks & Gotchas
 
 1. **Gateway token must be stable across redeploys** → Always set `OPENCLAW_GATEWAY_TOKEN` env variable in Railway (highest priority); token is synced to `openclaw.json` via direct JSON file write during onboarding and on every gateway start. This is required because `openclaw onboard` generates its own random token and the gateway reads from config file.
-2. **Channels are written via `config set --json`, not `channels add`** → avoids CLI version incompatibilities
+2. **Channels are written via `config set --strict-json`, not `channels add`** → avoids CLI version incompatibilities. `--json` is a legacy alias; `--strict-json` is the canonical flag since v2026.2.21.
 3. **Gateway readiness check polls multiple endpoints** (`/openclaw`, `/`, `/health`) → some builds only expose certain routes (src/server.js:119)
 4. **Discord bots require MESSAGE CONTENT INTENT** → documented in setup wizard (src/public/setup.html)
 5. **Gateway spawn inherits stdio** → logs appear in wrapper output (src/server.js:206)
@@ -245,3 +245,6 @@ This avoids repeatedly reading large files and provides instant context about th
 22. **Skill-enabling binaries in container** → `gh` (GitHub CLI), `ffmpeg`, `tmux` installed in the runtime image to unlock `github`, `video-frames`, `tmux` skills respectively. Skills also depend on env vars (`GEMINI_API_KEY`, `NOTION_API_KEY`, `OPENAI_API_KEY`, etc.) and tool policy settings.
 23. **Optional Chromium pre-install** → Build with `--build-arg OPENCLAW_INSTALL_BROWSER=true` to pre-install Chromium + Xvfb (~300MB) into the image. Avoids the 60-90s runtime Playwright install on first browser skill use. Disabled by default to keep image size small.
 24. **Hooks token must differ from gateway token** → v2026.2.21+ refuses to start if `hooks.token` matches `gateway.auth.token` (GHSA-76m6-pj3w-v7mf). The wrapper checks for and fixes collisions during onboarding and on every gateway start.
+25. **`--strict-json` is `config set`'s canonical flag** → v2026.2.21 added `--strict-json` as the canonical flag for JSON value parsing. `--json` remains as a legacy alias but may be deprecated. All channel config writes use `--strict-json`.
+26. **Gateway startup config verification** → After writing Control UI config on every gateway start, the wrapper reads back and verifies `dangerouslyDisableDeviceAuth` and `allowInsecureAuth` are set. A `CRITICAL` log line indicates silent write failure. Future openclaw releases may log a startup warning when `dangerouslyDisableDeviceAuth=true`; this is expected and does not affect functionality.
+27. **`channels.modelByChannel`** → v2026.2.21+ supports per-channel model overrides. Not exposed in the setup wizard; configure manually via `openclaw config set --strict-json channels.modelByChannel '{"telegram":"model-id"}'`.
