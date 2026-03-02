@@ -120,7 +120,7 @@ function sleep(ms) {
 async function waitForGatewayReady(opts = {}) {
   const timeoutMs = opts.timeoutMs ?? 60_000;
   const start = Date.now();
-  const endpoints = ["/openclaw", "/", "/health"];
+  const endpoints = ["/healthz", "/readyz", "/health", "/openclaw", "/"];
   
   while (Date.now() - start < timeoutMs) {
     for (const endpoint of endpoints) {
@@ -173,6 +173,7 @@ async function startGateway() {
     cfg.gateway.controlUi = cfg.gateway.controlUi || {};
     cfg.gateway.controlUi.allowInsecureAuth = true;
     cfg.gateway.controlUi.dangerouslyDisableDeviceAuth = true;
+    cfg.gateway.controlUi.allowedOrigins = ["*"];
 
     // Ensure hooks.token differs from gateway.auth.token (GHSA-76m6-pj3w-v7mf)
     const hooksToken = cfg?.hooks?.token;
@@ -183,7 +184,7 @@ async function startGateway() {
     }
 
     fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2), "utf8");
-    console.log(`[gateway] Config updated: auth.mode=token, trustedProxies=[loopback], allowInsecureAuth=true`);
+    console.log(`[gateway] Config updated: auth.mode=token, trustedProxies=[loopback], allowInsecureAuth=true, allowedOrigins=["*"]`);
 
     // Verify config was written correctly (catch silent write failures or race conditions)
     const verifyConfig = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
@@ -428,6 +429,14 @@ app.get("/setup/api/status", requireSetupAuth, async (_req, res) => {
       ],
     },
     {
+      value: "mistral",
+      label: "Mistral",
+      hint: "API key (memory embeddings + voice)",
+      options: [
+        { value: "mistral-api-key", label: "Mistral API key" },
+      ],
+    },
+    {
       value: "google",
       label: "Google",
       hint: "Gemini API key + OAuth",
@@ -443,6 +452,14 @@ app.get("/setup/api/status", requireSetupAuth, async (_req, res) => {
       hint: "Grok API key",
       options: [
         { value: "xai-api-key", label: "xAI Grok API key" },
+      ],
+    },
+    {
+      value: "kilocode",
+      label: "Kilo Gateway",
+      hint: "API key (default: claude-opus-4.6)",
+      options: [
+        { value: "kilocode-api-key", label: "Kilo Gateway API key" },
       ],
     },
     {
@@ -625,6 +642,8 @@ function buildOnboardArgs(payload) {
     const map = {
       "openai-api-key": "--openai-api-key",
       apiKey: "--anthropic-api-key",
+      "mistral-api-key": "--mistral-api-key",
+      "kilocode-api-key": "--kilocode-api-key",
       "openrouter-api-key": "--openrouter-api-key",
       "ai-gateway-api-key": "--ai-gateway-api-key",
       "moonshot-api-key": "--moonshot-api-key",
@@ -756,6 +775,7 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
         cfg.gateway.controlUi = cfg.gateway.controlUi || {};
         cfg.gateway.controlUi.allowInsecureAuth = true;
         cfg.gateway.controlUi.dangerouslyDisableDeviceAuth = true;
+        cfg.gateway.controlUi.allowedOrigins = ["*"];
 
         // Disable automatic plugin activation for security
         cfg.plugins = cfg.plugins || {};

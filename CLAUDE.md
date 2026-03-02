@@ -195,7 +195,7 @@ Edit `buildOnboardArgs()` (src/server.js:552-619) to add new CLI flags or auth p
 - Template must mount a volume at `/data`
 - Must set `SETUP_PASSWORD` in Railway Variables
 - Public networking must be enabled (assigns `*.up.railway.app` domain)
-- Openclaw version is pinned via Docker build arg `OPENCLAW_GIT_REF` (default: `v2026.2.21`)
+- Openclaw version is pinned via Docker build arg `OPENCLAW_GIT_REF` (default: `v2026.3.1`)
 
 ## Serena Semantic Coding
 
@@ -223,16 +223,16 @@ This avoids repeatedly reading large files and provides instant context about th
 
 1. **Gateway token must be stable across redeploys** → Always set `OPENCLAW_GATEWAY_TOKEN` env variable in Railway (highest priority); token is synced to `openclaw.json` via direct JSON file write during onboarding and on every gateway start. This is required because `openclaw onboard` generates its own random token and the gateway reads from config file.
 2. **Channels are written via `config set --strict-json`, not `channels add`** → avoids CLI version incompatibilities. `--json` is a legacy alias; `--strict-json` is the canonical flag since v2026.2.21.
-3. **Gateway readiness check polls multiple endpoints** (`/openclaw`, `/`, `/health`) → some builds only expose certain routes (src/server.js:119)
+3. **Gateway readiness check polls multiple endpoints** (`/healthz`, `/readyz`, `/health`, `/openclaw`, `/`) → v2026.3.1+ exposes built-in `/healthz` and `/readyz`; older builds fall back to `/openclaw` or `/` (src/server.js)
 4. **Discord bots require MESSAGE CONTENT INTENT** → documented in setup wizard (src/public/setup.html)
 5. **Gateway spawn inherits stdio** → logs appear in wrapper output (src/server.js:206)
 6. **WebSocket auth requires proxy event handlers** → Direct `req.headers` modification doesn't work for WebSocket upgrades with http-proxy; must use `headers` option in `proxy.ws()` to reliably inject Authorization header
 7. **Control UI requires allowInsecureAuth + trustedProxies + dangerouslyDisableDeviceAuth** → Three config settings applied during onboarding AND re-applied on every gateway start via direct JSON file write: `gateway.controlUi.allowInsecureAuth=true` (plain HTTP), `gateway.trustedProxies=["127.0.0.1","::1"]` (trust loopback proxy), `gateway.controlUi.dangerouslyDisableDeviceAuth=true` (bypass device pairing for WebSocket). v2026.2.21+ enforces device identity even for token-authenticated loopback connections (PR #22712 for auto-approve localhost pairing is unmerged). **Do NOT use `trusted-proxy` auth mode** — it has a known unmerged bug (PR #17705) where the device-pairing layer doesn't recognize it as valid auth.
 8. **Gateway `--allow-unconfigured` flag** → Added to gateway spawn args to support latest openclaw builds that require explicit opt-in for unconfigured state. Ignored by older builds.
 9. **Discord `dm` key renamed to `direct`** → Latest openclaw renamed the session key from `dm` to `direct` (with backward compat layer). Wrapper uses `direct` for forward compatibility.
-10. **Supported auth providers** → OpenAI, Anthropic, Chutes (OAuth), vLLM (OAuth), Google, OpenRouter, Vercel AI Gateway, Moonshot AI (Kimi K2.5), Z.AI (multiple endpoint variants), MiniMax (M2.5 + OAuth + CN endpoint), Qwen, Copilot, Synthetic, OpenCode Zen, LiteLLM, xAI (Grok), Qianfan, Xiaomi, Venice AI, Together AI, Hugging Face, Cloudflare AI Gateway, Custom Provider, Volcano Engine (Doubao), BytePlus. Flag mappings in `buildOnboardArgs()`.
+10. **Supported auth providers** → OpenAI, Anthropic, Chutes (OAuth), vLLM (OAuth), Google, Mistral (v2026.2.22), OpenRouter, Kilo Gateway (v2026.2.23), Vercel AI Gateway, Moonshot AI (Kimi K2.5), Z.AI (multiple endpoint variants), MiniMax (M2.5 + OAuth + CN endpoint), Qwen, Copilot, Synthetic, OpenCode Zen, LiteLLM, xAI (Grok), Qianfan, Xiaomi, Venice AI, Together AI, Hugging Face, Cloudflare AI Gateway, Custom Provider, Volcano Engine (Doubao), BytePlus. Flag mappings in `buildOnboardArgs()`.
 11. **IRC channel support** → Setup wizard supports IRC server/nick/channels/password configuration via `config set --json channels.irc`.
-12. **Feishu/Lark moved to community plugin** → No longer built-in; users must install `clawdbot-feishu` from the plugin registry.
+12. **Feishu/Lark moved to community plugin** → No longer built-in; users must install `clawdbot-feishu` from the plugin registry. Upstream is actively improving Feishu support (v2026.2.22-v2026.3.1 had multiple Feishu fixes) but it remains a plugin.
 13. **DO NOT use `USER node` in Dockerfile** → Railway 볼륨(`/data`)은 root 소유이며, non-root 사용자로 전환하면 기존 config/data 파일 접근 불가. `entrypoint.sh`의 `chown` 우회도 실패함. Railway 컨테이너는 격리 환경이므로 root 실행 유지.
 14. **Token logging is debug-only** → Full token values are only logged when `OPENCLAW_TEMPLATE_DEBUG=true`. Production logs show only first 16 chars.
 15. **Plugin auto-enable disabled** → `plugins.autoEnable` set to `false` during onboarding for security.
@@ -248,3 +248,12 @@ This avoids repeatedly reading large files and provides instant context about th
 25. **`--strict-json` is `config set`'s canonical flag** → v2026.2.21 added `--strict-json` as the canonical flag for JSON value parsing. `--json` remains as a legacy alias but may be deprecated. All channel config writes use `--strict-json`.
 26. **Gateway startup config verification** → After writing Control UI config on every gateway start, the wrapper reads back and verifies `dangerouslyDisableDeviceAuth` and `allowInsecureAuth` are set. A `CRITICAL` log line indicates silent write failure. Future openclaw releases may log a startup warning when `dangerouslyDisableDeviceAuth=true`; this is expected and does not affect functionality.
 27. **`channels.modelByChannel`** → v2026.2.21+ supports per-channel model overrides. Not exposed in the setup wizard; configure manually via `openclaw config set --strict-json channels.modelByChannel '{"telegram":"model-id"}'`.
+28. **Gateway built-in health endpoints** → v2026.3.1+ exposes `/healthz` (liveness) and `/readyz` (readiness) natively. The wrapper probes these first for faster ready-detection; older builds fall back to `/openclaw` or `/`.
+29. **Heartbeat DM policy change (BREAKING)** → v2026.2.24 changed default heartbeat behavior: DMs no longer receive heartbeat messages by default. Configure `channels.<type>.heartbeat.dm` explicitly if needed.
+30. **Browser SSRF default (BREAKING)** → v2026.2.25 defaults `browser.blockLocalRequests` to `true`. Browser skills can no longer access localhost/internal IPs unless explicitly allowed via `openclaw config set browser.blockLocalRequests false`.
+31. **Sandbox namespace-join (BREAKING)** → v2026.3.1 sandbox containers now use namespace-join instead of standalone namespaces. This is transparent to the wrapper but may affect custom sandbox configurations.
+32. **Docker permission normalization** → v2026.3.1 (#30139) requires consistent permissions on extensions/agent dirs. The Dockerfile normalizes permissions after copying the built openclaw to prevent runtime permission errors.
+33. **Control UI `allowedOrigins` wildcard** → `gateway.controlUi.allowedOrigins` set to `["*"]` during onboarding and on every gateway start. Required for Railway custom domains + `*.up.railway.app` to work without CORS issues. Safe because traffic is behind token auth + reverse proxy.
+34. **External secrets support** → v2026.2.26+ supports external secret providers. Not exposed in the setup wizard; configure manually via `config set`.
+35. **Agents routing CLI** → v2026.3.1 added `openclaw agents route` CLI for multi-agent routing. Not exposed in the setup wizard.
+36. **Config file commands** → v2026.3.1 added `openclaw config export` and `openclaw config import` for config portability.
