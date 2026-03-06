@@ -175,6 +175,10 @@ async function startGateway() {
     cfg.gateway.controlUi.dangerouslyDisableDeviceAuth = true;
     cfg.gateway.controlUi.allowedOrigins = ["*"];
 
+    // Ensure full tool access (v2026.3.2 defaults tools.profile to "messaging")
+    cfg.tools = cfg.tools || {};
+    cfg.tools.profile = "full";
+
     // Ensure hooks.token differs from gateway.auth.token (GHSA-76m6-pj3w-v7mf)
     const hooksToken = cfg?.hooks?.token;
     if (hooksToken && hooksToken === OPENCLAW_GATEWAY_TOKEN) {
@@ -184,7 +188,7 @@ async function startGateway() {
     }
 
     fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2), "utf8");
-    console.log(`[gateway] Config updated: auth.mode=token, trustedProxies=[loopback], allowInsecureAuth=true, allowedOrigins=["*"]`);
+    console.log(`[gateway] Config updated: auth.mode=token, trustedProxies=[loopback], allowInsecureAuth=true, allowedOrigins=["*"], tools.profile=full`);
 
     // Verify config was written correctly (catch silent write failures or race conditions)
     const verifyConfig = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
@@ -245,6 +249,14 @@ async function ensureGatewayRunning() {
   if (!gatewayStarting) {
     gatewayStarting = (async () => {
       await startGateway();
+
+      // Non-blocking config validation (v2026.3.2+)
+      try {
+        const v = await runCmd(OPENCLAW_NODE, clawArgs(["config", "validate"]));
+        if (v.code !== 0) console.warn(`[gateway] config validate: ${(v.output || "").trim()}`);
+        else console.log("[gateway] config validate: OK");
+      } catch (_) { /* config validate may not exist on older builds */ }
+
       const ready = await waitForGatewayReady({ timeoutMs: 60_000 });
       if (!ready) {
         throw new Error("Gateway did not become ready in time");
@@ -781,6 +793,10 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
         cfg.plugins = cfg.plugins || {};
         cfg.plugins.autoEnable = false;
 
+        // Ensure full tool access (v2026.3.2 defaults tools.profile to "messaging")
+        cfg.tools = cfg.tools || {};
+        cfg.tools.profile = "full";
+
         // Ensure hooks.token differs from gateway.auth.token (GHSA-76m6-pj3w-v7mf)
         const hooksToken = cfg?.hooks?.token;
         if (hooksToken && hooksToken === OPENCLAW_GATEWAY_TOKEN) {
@@ -790,7 +806,7 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
         }
 
         fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2), "utf8");
-        console.log("[onboard] Config updated: auth.mode=token, trustedProxies=[loopback], allowInsecureAuth=true, plugins.autoEnable=false");
+        console.log("[onboard] Config updated: auth.mode=token, trustedProxies=[loopback], allowInsecureAuth=true, plugins.autoEnable=false, tools.profile=full");
       } catch (err) {
         console.error(`[onboard] Failed to update config: ${err.message}`);
         extra += `\n[ERROR] Failed to update config: ${err.message}\n`;

@@ -195,7 +195,7 @@ Edit `buildOnboardArgs()` (src/server.js:552-619) to add new CLI flags or auth p
 - Template must mount a volume at `/data`
 - Must set `SETUP_PASSWORD` in Railway Variables
 - Public networking must be enabled (assigns `*.up.railway.app` domain)
-- Openclaw version is pinned via Docker build arg `OPENCLAW_GIT_REF` (default: `v2026.3.1`)
+- Openclaw version is pinned via Docker build arg `OPENCLAW_GIT_REF` (default: `v2026.3.2`)
 
 ## Serena Semantic Coding
 
@@ -257,3 +257,9 @@ This avoids repeatedly reading large files and provides instant context about th
 34. **External secrets support** → v2026.2.26+ supports external secret providers. Not exposed in the setup wizard; configure manually via `config set`.
 35. **Agents routing CLI** → v2026.3.1 added `openclaw agents route` CLI for multi-agent routing. Not exposed in the setup wizard.
 36. **Config file commands** → v2026.3.1 added `openclaw config export` and `openclaw config import` for config portability.
+37. **`tools.profile` default → "messaging" (BREAKING)** → v2026.3.2 defaults to messaging-only tools. Wrapper sets `tools.profile="full"` during onboarding and on every gateway start.
+38. **ACP dispatch defaults to enabled** → v2026.3.2 enables ACP dispatch by default. Transparent to wrapper.
+39. **Control UI basePath fix (#32311)** → v2026.3.1 regression: non-GET under controlUiBasePath returned 405, blocking plugin webhooks. Fixed in v2026.3.2.
+40. **`config validate` command** → v2026.3.2 added `openclaw config validate`. Wrapper runs it during startup for informational logging; failures don't block gateway start.
+41. **Plugin SDK: `registerHttpHandler` removed** → Use `registerHttpRoute` instead. Does not affect wrapper.
+42. **WebSocket ws:// loopback-only** → v2026.3.2 restricts plaintext ws:// to loopback by default. Transparent (wrapper connects to localhost).
