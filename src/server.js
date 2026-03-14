@@ -175,7 +175,7 @@ async function startGateway() {
     cfg.gateway.controlUi.dangerouslyDisableDeviceAuth = true;
     cfg.gateway.controlUi.allowedOrigins = ["*"];
 
-    // Ensure full tool access (v2026.3.2 defaults tools.profile to "messaging")
+    // Ensure full tool access (v2026.3.2+ defaults tools.profile to "messaging")
     cfg.tools = cfg.tools || {};
     cfg.tools.profile = "full";
 
@@ -793,7 +793,7 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
         cfg.plugins = cfg.plugins || {};
         cfg.plugins.autoEnable = false;
 
-        // Ensure full tool access (v2026.3.2 defaults tools.profile to "messaging")
+        // Ensure full tool access (v2026.3.2+ defaults tools.profile to "messaging")
         cfg.tools = cfg.tools || {};
         cfg.tools.profile = "full";
 

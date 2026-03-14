@@ -195,7 +195,7 @@ Edit `buildOnboardArgs()` (src/server.js:552-619) to add new CLI flags or auth p
 - Template must mount a volume at `/data`
 - Must set `SETUP_PASSWORD` in Railway Variables
 - Public networking must be enabled (assigns `*.up.railway.app` domain)
-- Openclaw version is pinned via Docker build arg `OPENCLAW_GIT_REF` (default: `v2026.3.2`)
+- Openclaw version is pinned via Docker build arg `OPENCLAW_GIT_REF` (default: `v2026.3.13`)
 
 ## Serena Semantic Coding
 
@@ -263,3 +263,13 @@ This avoids repeatedly reading large files and provides instant context about th
 40. **`config validate` command** → v2026.3.2 added `openclaw config validate`. Wrapper runs it during startup for informational logging; failures don't block gateway start.
 41. **Plugin SDK: `registerHttpHandler` removed** → Use `registerHttpRoute` instead. Does not affect wrapper.
 42. **WebSocket ws:// loopback-only** → v2026.3.2 restricts plaintext ws:// to loopback by default. Transparent (wrapper connects to localhost).
+43. **`loadConfig()` fail-closed (BREAKING)** → v2026.3.7 makes `loadConfig()` fail-closed: invalid config prevents gateway startup entirely. Wrapper writes config via direct JSON file write (always valid) and catches write errors, so no code change needed. `config validate` (line 253-258) provides early warning.
+44. **`gateway.auth.mode` explicit required (BREAKING)** → v2026.3.7 requires explicit `gateway.auth.mode`. Already handled: wrapper sets `gateway.auth.mode = "token"` during onboarding and on every gateway start.
+45. **Workspace plugin auto-load disabled by default (BREAKING)** → v2026.3.12 disables workspace plugin auto-load (GHSA-99qw-6mr3-36qr). Default is now safe; no wrapper change needed.
+46. **`OPENCLAW_VARIANT=slim` build option** → v2026.3.7 added slim variant build arg. Not used by this template; default full build is used.
+47. **`OPENCLAW_EXTENSIONS` build option** → v2026.3.7 added selective extension bundling. Not used; all extensions included by default.
+48. **`OPENCLAW_TZ` environment variable** → v2026.3.13 added timezone support via `OPENCLAW_TZ`. Set via Railway Variables if needed; not configured by default.
+49. **Ollama official onboarding** → v2026.3.11 added native Ollama auth provider. Not exposed in setup wizard; use `openclaw onboard` CLI directly.
+50. **`openclaw backup create/verify` CLI** → v2026.3.8 added native backup commands. Wrapper retains its own tar-based `/setup/export` for simplicity.
+51. **Dashboard v2** → v2026.3.12 ships Dashboard v2 for Control UI at `/openclaw`. Applied automatically; no wrapper change needed.
+52. **WebSocket origin validation hardened** → v2026.3.11 strengthened WebSocket origin checks (GHSA-5wcw-8jjv-m286). No impact: wrapper uses token auth (not trusted-proxy) and sets `allowedOrigins: ["*"]`.
