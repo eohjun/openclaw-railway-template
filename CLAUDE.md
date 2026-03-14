@@ -195,7 +195,7 @@ Edit `buildOnboardArgs()` (src/server.js:552-619) to add new CLI flags or auth p
 - Template must mount a volume at `/data`
 - Must set `SETUP_PASSWORD` in Railway Variables
 - Public networking must be enabled (assigns `*.up.railway.app` domain)
-- Openclaw version is pinned via Docker build arg `OPENCLAW_GIT_REF` (default: `v2026.3.13`)
+- Openclaw version is pinned via Docker build arg `OPENCLAW_GIT_REF` (default: `v2026.3.12`)
 
 ## Serena Semantic Coding
 
@@ -268,8 +268,8 @@ This avoids repeatedly reading large files and provides instant context about th
 45. **Workspace plugin auto-load disabled by default (BREAKING)** → v2026.3.12 disables workspace plugin auto-load (GHSA-99qw-6mr3-36qr). Default is now safe; no wrapper change needed.
 46. **`OPENCLAW_VARIANT=slim` build option** → v2026.3.7 added slim variant build arg. Not used by this template; default full build is used.
 47. **`OPENCLAW_EXTENSIONS` build option** → v2026.3.7 added selective extension bundling. Not used; all extensions included by default.
-48. **`OPENCLAW_TZ` environment variable** → v2026.3.13 added timezone support via `OPENCLAW_TZ`. Set via Railway Variables if needed; not configured by default.
-49. **Ollama official onboarding** → v2026.3.11 added native Ollama auth provider. Not exposed in setup wizard; use `openclaw onboard` CLI directly.
-50. **`openclaw backup create/verify` CLI** → v2026.3.8 added native backup commands. Wrapper retains its own tar-based `/setup/export` for simplicity.
-51. **Dashboard v2** → v2026.3.12 ships Dashboard v2 for Control UI at `/openclaw`. Applied automatically; no wrapper change needed.
-52. **WebSocket origin validation hardened** → v2026.3.11 strengthened WebSocket origin checks (GHSA-5wcw-8jjv-m286). No impact: wrapper uses token auth (not trusted-proxy) and sets `allowedOrigins: ["*"]`.
+48. **Ollama official onboarding** → v2026.3.11 added native Ollama auth provider. Not exposed in setup wizard; use `openclaw onboard` CLI directly.
+49. **`openclaw backup create/verify` CLI** → v2026.3.8 added native backup commands. Wrapper retains its own tar-based `/setup/export` for simplicity.
+50. **Dashboard v2** → v2026.3.12 ships Dashboard v2 for Control UI at `/openclaw`. Applied automatically; no wrapper change needed.
+51. **WebSocket origin validation hardened** → v2026.3.11 strengthened WebSocket origin checks (GHSA-5wcw-8jjv-m286). No impact: wrapper uses token auth (not trusted-proxy) and sets `allowedOrigins: ["*"]`.
+52. **v2026.3.13 build broken** → `src/browser/` TypeScript errors in upstream v2026.3.13 tag (`pw-ai.ts`, `agent.act.ts`). Skipped; pinned to v2026.3.12 instead.
